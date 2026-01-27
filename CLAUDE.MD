@@ -708,34 +708,228 @@ async function withRetry<T>(
 
 ---
 
-## Roadmap
+## Launchpad Competitive Analysis
 
-### Phase 1: MVP
-- [x] Deep research and documentation
-- [ ] Project scaffolding (package.json, tsconfig)
-- [ ] MCP server setup with stdio transport
-- [ ] Create token tool (pump.fun)
-- [ ] Buy/sell tools
-- [ ] Get token info tool
+### Market Overview (2025-2026)
 
-### Phase 2: Production Ready
-- [ ] Priority fee optimization (Helius API)
-- [ ] Transaction simulation
-- [ ] Comprehensive error handling
-- [ ] Rate limiting
-- [ ] Balance checking
+| Platform | Market Share | Daily Revenue | Tokens/Day | Graduation Rate |
+|----------|--------------|---------------|------------|-----------------|
+| **Pump.fun** | 73-80% | $13.5M peak | 72,000+ | ~1.4% |
+| **LetsBonk** | 15-64% (varies) | $7.9M peak | 45,000+ | ~2% |
+| **LaunchLab** | 5-15% | $2.8M rewards | 15,000+ | Higher |
+| **Moonshot** | <5% | N/A | 333 (launch) | 8% |
+| **Believe** | Growing | $13M creator fees | 14,000+ | N/A |
 
-### Phase 3: Advanced Features
-- [ ] Bonding curve monitoring
-- [ ] Graduation detection
-- [ ] Multi-wallet support
-- [ ] Transaction history
+### Fee Structure Comparison
 
-### Phase 4: Deployment
-- [ ] Mainnet testing
-- [ ] Security review
-- [ ] Documentation site
-- [ ] npm package publish
+| Platform | Creation Fee | Trading Fee | Graduation Fee | Creator Reward |
+|----------|--------------|-------------|----------------|----------------|
+| **Pump.fun** | FREE (buyer pays) | 1% | 1.5 SOL | 0.5 SOL + 50% LP fees |
+| **LetsBonk** | ~0.02 SOL | 1% | Similar | 1% of trading fees |
+| **LaunchLab** | FREE | Variable | 85 SOL threshold | 10% LP fees (with NFT) |
+| **Moonshot** | 0.02 SOL | 1% | 500 SOL | N/A |
+| **Believe** | FREE (via tweet) | 2% | $100K mcap | 1% of fees |
+
+### Graduation Mechanics
+
+| Platform | Threshold | Migration Target | LP Handling |
+|----------|-----------|------------------|-------------|
+| **Pump.fun** | ~$69K mcap / 85 SOL | PumpSwap (native) | Auto-locked |
+| **LetsBonk** | 85 SOL | Raydium | Burned |
+| **LaunchLab** | 30-85 SOL (configurable) | Raydium CPMM | 90% burned, 10% locked |
+| **Moonshot** | 500 SOL | Raydium | Locked |
+| **Believe** | $100K mcap | Meteora | Auto |
+
+### Key Differentiators
+
+#### Pump.fun (Market Leader)
+- **Strength**: First mover, massive liquidity, native DEX (PumpSwap)
+- **Innovation**: Project Ascend (dynamic fees 0.05%-0.95%), creator revenue sharing
+- **Stats**: $800M+ lifetime revenue, fastest to $100M in crypto history
+
+#### LetsBonk/Bonk.fun
+- **Strength**: BONK ecosystem integration, validator rewards
+- **Innovation**: Fee distribution (40% devs, 30% validators, 30% BONK buyback)
+- **Unique**: Tied to established meme coin ecosystem
+
+#### Raydium LaunchLab
+- **Strength**: DEX integration, customization options
+- **Innovation**: Multiple curve types (linear, exponential, logarithmic)
+- **Unique**: JustSendit mode vs LaunchLab mode, vesting options
+
+#### Believe App
+- **Strength**: Social-first (launch via Twitter reply)
+- **Innovation**: Zero wallet needed, AI-powered token creation
+- **Risk**: Metadata can be changed post-launch (security concern)
+
+#### Moonshot (DEX Screener)
+- **Strength**: Built-in analytics, audited contracts
+- **Innovation**: Pre-audited templates, anti-manipulation
+- **Unique**: Higher graduation threshold (500 SOL)
+
+### What Makes Launchpads Successful
+
+1. **Simplicity**: One-click token creation, no coding required
+2. **Low Costs**: Free or near-free creation (< 0.02 SOL)
+3. **Fair Launch**: No presales, no team allocations, bonding curve pricing
+4. **Instant Liquidity**: Bonding curve provides immediate trading
+5. **Security**: Auto-revoked authorities, locked LP, audited contracts
+6. **Creator Incentives**: Revenue sharing, rewards on graduation
+7. **Network Effects**: More users → more liquidity → more users
+
+---
+
+## ClaudeCandle Unique Value Proposition
+
+### Why MCP-Based Launchpad?
+
+1. **Conversational UX**: Launch tokens through natural language
+2. **AI-Guided**: Claude helps with naming, tokenomics, strategy
+3. **Education**: Explains risks, best practices during creation
+4. **Automation**: Multi-step workflows handled seamlessly
+5. **Integration**: Works with Claude Desktop, IDE extensions, custom agents
+
+### Differentiation Strategy
+
+| Feature | Pump.fun | ClaudeCandle |
+|---------|----------|--------------|
+| Interface | Web UI | Conversational AI |
+| Learning Curve | Minutes | Seconds (just talk) |
+| Guidance | None | AI-assisted decisions |
+| Batch Operations | Manual | Automated workflows |
+| Analytics | Basic | AI-powered insights |
+| Security Checks | Post-creation | Pre-creation warnings |
+
+---
+
+## Implementation Roadmap
+
+### Phase 1: Foundation (Week 1-2)
+**Goal**: Working MCP server that can create tokens on devnet
+
+- [ ] **Project Setup**
+  - [ ] Initialize npm project with TypeScript
+  - [ ] Configure tsconfig.json for ES modules
+  - [ ] Set up .env and .gitignore
+  - [ ] Create folder structure
+
+- [ ] **Core MCP Server**
+  - [ ] Set up McpServer with stdio transport
+  - [ ] Implement health check tool
+  - [ ] Add Solana connection service
+  - [ ] Add secure keypair loading
+
+- [ ] **First Tool: create-token**
+  - [ ] Integrate @pump-fun/pump-sdk
+  - [ ] Implement token creation with metadata
+  - [ ] Add input validation (Zod schemas)
+  - [ ] Return transaction signature and links
+
+### Phase 2: Trading Tools (Week 3)
+**Goal**: Complete buy/sell functionality
+
+- [ ] **buy-token tool**
+  - [ ] SOL amount input with slippage
+  - [ ] Transaction simulation before execution
+  - [ ] Priority fee optimization
+
+- [ ] **sell-token tool**
+  - [ ] Token amount or percentage input
+  - [ ] Partial and full sells
+  - [ ] Slippage protection
+
+- [ ] **Query Tools**
+  - [ ] get-token-info (metadata, supply, price)
+  - [ ] get-bonding-curve (progress, reserves)
+  - [ ] get-balance (SOL and token balances)
+
+### Phase 3: Production Hardening (Week 4)
+**Goal**: Mainnet-ready with robust error handling
+
+- [ ] **Transaction Reliability**
+  - [ ] Helius Priority Fee API integration
+  - [ ] Compute unit optimization
+  - [ ] Retry logic with exponential backoff
+  - [ ] Transaction confirmation tracking
+
+- [ ] **Security**
+  - [ ] Input sanitization
+  - [ ] Rate limiting
+  - [ ] Audit logging
+  - [ ] Devnet/mainnet separation
+
+- [ ] **Error Handling**
+  - [ ] Comprehensive error messages
+  - [ ] User-friendly explanations
+  - [ ] Recovery suggestions
+
+### Phase 4: Advanced Features (Week 5-6)
+**Goal**: Differentiated features
+
+- [ ] **Monitoring Tools**
+  - [ ] watch-bonding-curve (real-time updates)
+  - [ ] alert-graduation (notify on completion)
+  - [ ] portfolio-tracker (track created tokens)
+
+- [ ] **AI-Enhanced Features**
+  - [ ] Token name suggestions
+  - [ ] Risk assessment before creation
+  - [ ] Market analysis integration
+
+- [ ] **Multi-Platform Support**
+  - [ ] LaunchLab integration (optional)
+  - [ ] PumpSwap trading post-graduation
+
+### Phase 5: Launch (Week 7+)
+**Goal**: Public release
+
+- [ ] **Testing**
+  - [ ] Comprehensive devnet testing
+  - [ ] Limited mainnet beta
+  - [ ] Security review
+
+- [ ] **Documentation**
+  - [ ] User guide
+  - [ ] API reference
+  - [ ] Video tutorials
+
+- [ ] **Distribution**
+  - [ ] npm package publish
+  - [ ] MCP registry listing
+  - [ ] Community outreach
+
+---
+
+## Next Steps (Immediate Actions)
+
+### Step 1: Initialize Project
+```bash
+mkdir -p src/{tools,services,utils,config,types}
+npm init -y
+npm install @modelcontextprotocol/sdk @pump-fun/pump-sdk @solana/web3.js zod bs58 dotenv
+npm install -D typescript @types/node
+npx tsc --init
+```
+
+### Step 2: Create Core Files
+1. `src/index.ts` - MCP server entry point
+2. `src/config/constants.ts` - Program IDs, seeds
+3. `src/services/solana.ts` - Connection management
+4. `src/services/pump.ts` - Pump.fun SDK wrapper
+5. `src/utils/keypair.ts` - Secure key loading
+6. `src/tools/createToken.ts` - First tool
+
+### Step 3: Test on Devnet
+1. Get devnet SOL from faucet
+2. Create test token
+3. Verify on Solscan/Solana Explorer
+4. Test buy/sell operations
+
+### Step 4: Iterate and Expand
+1. Add remaining tools
+2. Improve error handling
+3. Add transaction optimization
+4. Prepare for mainnet
 
 ---
 
