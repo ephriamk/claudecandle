@@ -2,9 +2,6 @@ import { PublicKey } from "@solana/web3.js";
 import { z } from "zod";
 import {
   getConnection,
-  getSolBalance,
-  formatSol,
-  getExplorerUrl,
 } from "../services/solana.js";
 import { loadKeypair, isValidSolanaAddress } from "../utils/keypair.js";
 import { LAMPORTS_PER_SOL } from "../config/constants.js";

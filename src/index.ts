@@ -5,11 +5,19 @@
  *
  * An MCP server that enables Claude to create and trade meme coins on Solana
  * through natural language conversations.
+ *
+ * Tools:
+ * - create-token: Launch new tokens on pump.fun
+ * - buy-token: Buy tokens from bonding curve
+ * - sell-token: Sell tokens to bonding curve
+ * - get-balance: Check wallet balances
+ * - get-token-info: Get token metadata
+ * - get-bonding-curve: Check curve status
+ * - server-status: Health check
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
 import dotenv from "dotenv";
 
 // Load environment variables
@@ -31,8 +39,30 @@ import {
   getBondingCurveDescription,
 } from "./tools/getTokenInfo.js";
 
+import {
+  createToken,
+  createTokenSchema,
+  createTokenDescription,
+} from "./tools/createToken.js";
+
+import {
+  buyToken,
+  buyTokenSchema,
+  buyTokenDescription,
+  sellToken,
+  sellTokenSchema,
+  sellTokenDescription,
+} from "./tools/tradeToken.js";
+
 // Import services
-import { getConnection, getNetwork, isMainnet, getExplorerUrl, getPumpFunUrl } from "./services/solana.js";
+import {
+  getConnection,
+  getNetwork,
+  isMainnet,
+  getExplorerUrl,
+  getPumpFunUrl,
+  getSolBalance,
+} from "./services/solana.js";
 import { loadKeypair, getPublicKeyString } from "./utils/keypair.js";
 
 // =============================================================================
@@ -43,6 +73,131 @@ const server = new McpServer({
   name: "claudecandle",
   version: "1.0.0",
 });
+
+// =============================================================================
+// Tool: create-token
+// =============================================================================
+
+server.tool(
+  "create-token",
+  createTokenDescription,
+  createTokenSchema,
+  async (params) => {
+    const result = await createToken(params);
+
+    if (!result.success) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: `❌ **Token Creation Failed**\n\nError: ${result.error}`,
+        }],
+      };
+    }
+
+    const data = result.data!;
+    let text = `🎉 **Token Created Successfully!**\n\n`;
+    text += `**Name:** ${params.name}\n`;
+    text += `**Symbol:** ${params.symbol}\n`;
+    text += `**Mint Address:** \`${data.mintAddress}\`\n\n`;
+    text += `**Links:**\n`;
+    text += `- [View on Pump.fun](${data.pumpfunUrl})\n`;
+    text += `- [View Transaction](${data.explorerUrl})\n`;
+
+    if (params.initialBuySol && params.initialBuySol > 0) {
+      text += `\n**Initial Buy:** ${params.initialBuySol} SOL`;
+      if (data.tokensReceived) {
+        text += ` → ${data.tokensReceived} tokens`;
+      }
+    }
+
+    text += `\n\n💡 Share this link to let others trade your token!`;
+
+    return {
+      content: [{
+        type: "text" as const,
+        text,
+      }],
+    };
+  }
+);
+
+// =============================================================================
+// Tool: buy-token
+// =============================================================================
+
+server.tool(
+  "buy-token",
+  buyTokenDescription,
+  buyTokenSchema,
+  async (params) => {
+    const result = await buyToken(params);
+
+    if (!result.success) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: `❌ **Buy Failed**\n\nError: ${result.error}`,
+        }],
+      };
+    }
+
+    const data = result.data!;
+    const explorerUrl = getExplorerUrl(data.signature, "tx");
+    const pumpUrl = getPumpFunUrl(params.mintAddress);
+
+    let text = `✅ **Buy Successful!**\n\n`;
+    text += `**Spent:** ${params.solAmount} SOL\n`;
+    text += `**Received:** ${data.tokensReceived} tokens\n\n`;
+    text += `**Links:**\n`;
+    text += `- [View Transaction](${explorerUrl})\n`;
+    text += `- [View Token](${pumpUrl})\n`;
+
+    return {
+      content: [{
+        type: "text" as const,
+        text,
+      }],
+    };
+  }
+);
+
+// =============================================================================
+// Tool: sell-token
+// =============================================================================
+
+server.tool(
+  "sell-token",
+  sellTokenDescription,
+  sellTokenSchema,
+  async (params) => {
+    const result = await sellToken(params);
+
+    if (!result.success) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: `❌ **Sell Failed**\n\nError: ${result.error}`,
+        }],
+      };
+    }
+
+    const data = result.data!;
+    const explorerUrl = getExplorerUrl(data.signature, "tx");
+
+    let text = `✅ **Sell Successful!**\n\n`;
+    text += `**Sold:** ${data.tokensSold} tokens\n`;
+    text += `**Received:** ${data.solReceived}\n\n`;
+    text += `**Links:**\n`;
+    text += `- [View Transaction](${explorerUrl})\n`;
+
+    return {
+      content: [{
+        type: "text" as const,
+        text,
+      }],
+    };
+  }
+);
 
 // =============================================================================
 // Tool: get-balance
@@ -59,7 +214,7 @@ server.tool(
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ success: false, error: result.error }, null, 2),
+          text: `❌ **Error:** ${result.error}`,
         }],
       };
     }
@@ -102,7 +257,7 @@ server.tool(
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ success: false, error: result.error }, null, 2),
+          text: `❌ **Error:** ${result.error}`,
         }],
       };
     }
@@ -151,7 +306,7 @@ server.tool(
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ success: false, error: result.error }, null, 2),
+          text: `❌ **Error:** ${result.error}`,
         }],
       };
     }
@@ -194,7 +349,7 @@ server.tool(
 
 server.tool(
   "server-status",
-  "Check ClaudeCandle server status and configuration",
+  "Check ClaudeCandle server status, wallet configuration, and available tools",
   {},
   async () => {
     const network = getNetwork();
@@ -202,11 +357,19 @@ server.tool(
 
     let walletStatus = "Not configured";
     let walletAddress = "N/A";
+    let solBalance = "N/A";
 
     try {
       const wallet = loadKeypair();
       walletAddress = getPublicKeyString(wallet);
       walletStatus = "Configured ✅";
+
+      try {
+        const balance = await getSolBalance(wallet.publicKey);
+        solBalance = `${balance.toFixed(4)} SOL`;
+      } catch {
+        solBalance = "Error fetching";
+      }
     } catch (error) {
       walletStatus = `Error: ${error instanceof Error ? error.message : "Unknown"}`;
     }
@@ -228,18 +391,21 @@ server.tool(
 
     if (walletAddress !== "N/A") {
       text += `**Address:** \`${walletAddress}\`\n`;
+      text += `**Balance:** ${solBalance}\n`;
     }
 
     text += `\n**Available Tools:**\n`;
+    text += `- \`create-token\` - Create new tokens on pump.fun\n`;
+    text += `- \`buy-token\` - Buy tokens from bonding curve\n`;
+    text += `- \`sell-token\` - Sell tokens to bonding curve\n`;
     text += `- \`get-balance\` - Check wallet balances\n`;
     text += `- \`get-token-info\` - Get token information\n`;
     text += `- \`get-bonding-curve\` - Check bonding curve status\n`;
     text += `- \`server-status\` - This status check\n`;
 
-    text += `\n**Coming Soon:**\n`;
-    text += `- \`create-token\` - Create new tokens on pump.fun\n`;
-    text += `- \`buy-token\` - Buy tokens from bonding curve\n`;
-    text += `- \`sell-token\` - Sell tokens to bonding curve\n`;
+    if (isMain) {
+      text += `\n⚠️ **Warning:** You are connected to MAINNET. Real funds will be used!`;
+    }
 
     return {
       content: [{
@@ -262,13 +428,16 @@ async function main() {
 
   try {
     const wallet = loadKeypair();
+    const balance = await getSolBalance(wallet.publicKey);
     console.error(`   Wallet: ${getPublicKeyString(wallet)}`);
+    console.error(`   Balance: ${balance.toFixed(4)} SOL`);
   } catch {
     console.error("   Wallet: Not configured (set WALLET_PRIVATE_KEY)");
   }
 
   await server.connect(transport);
   console.error("🕯️ ClaudeCandle MCP Server running!");
+  console.error("   Tools: create-token, buy-token, sell-token, get-balance, get-token-info, get-bonding-curve, server-status");
 }
 
 main().catch((error) => {

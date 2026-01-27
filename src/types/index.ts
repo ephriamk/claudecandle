@@ -156,6 +156,8 @@ export interface AppConfig {
 
 export type PriorityLevel = "min" | "low" | "medium" | "high" | "veryHigh" | "unsafeMax";
 
+export type NetworkName = "mainnet-beta" | "devnet" | "testnet";
+
 export interface PriorityFeeEstimate {
   priorityFeeEstimate: number;
   priorityFeeLevels?: {
