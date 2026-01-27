@@ -1,5 +1,30 @@
 # ClaudeCandle - MCP Meme Coin Launchpad
 
+> **The world's first AI-powered meme coin launchpad using Model Context Protocol (MCP)**
+
+## Executive Summary
+
+| Aspect | Details |
+|--------|---------|
+| **What** | MCP server enabling Claude to create & trade meme coins on Solana |
+| **Platform** | Pump.fun integration (73-80% market share, $800M+ revenue) |
+| **Tech** | TypeScript, @pump-fun/pump-sdk, Token2022, Helius RPC |
+| **Unique Value** | Conversational UX, AI-guided decisions, automated workflows |
+| **Status** | Research complete, ready for implementation |
+
+### Quick Start (After Implementation)
+
+```
+User: "Create a meme coin called MOONDOG with a rocket dog logo"
+
+Claude: Creating MOONDOG token on pump.fun...
+        ✅ Token created!
+        📍 Mint: 7xKXtg...
+        🔗 https://pump.fun/7xKXtg...
+```
+
+---
+
 ## Project Vision
 
 ClaudeCandle is the world's first MCP (Model Context Protocol) skill-based meme coin launchpad on the Solana blockchain. Users can interact with Claude to create, configure, and launch meme coins through natural language conversations.
@@ -539,6 +564,230 @@ server.tool(
 | `simulate-buy` | Simulate buy without executing | mintAddress, solAmount |
 | `simulate-sell` | Simulate sell without executing | mintAddress, tokenAmount |
 
+### Detailed Tool Specifications
+
+#### create-token
+
+```typescript
+// Zod Schema
+const createTokenSchema = {
+  name: z.string()
+    .min(1, "Name is required")
+    .max(32, "Name must be 32 characters or less")
+    .describe("Token name (e.g., 'Dogwifhat')"),
+
+  symbol: z.string()
+    .min(1, "Symbol is required")
+    .max(10, "Symbol must be 10 characters or less")
+    .regex(/^[A-Z0-9]+$/, "Symbol must be uppercase alphanumeric")
+    .describe("Token symbol/ticker (e.g., 'WIF')"),
+
+  description: z.string()
+    .max(500, "Description must be 500 characters or less")
+    .default("")
+    .describe("Token description for metadata"),
+
+  imageUrl: z.string()
+    .url("Must be a valid URL")
+    .optional()
+    .describe("Token logo URL (PNG/JPG, recommended 512x512)"),
+
+  twitter: z.string()
+    .url()
+    .optional()
+    .describe("Twitter/X profile URL"),
+
+  telegram: z.string()
+    .url()
+    .optional()
+    .describe("Telegram group URL"),
+
+  website: z.string()
+    .url()
+    .optional()
+    .describe("Project website URL"),
+
+  initialBuySol: z.number()
+    .min(0, "Cannot be negative")
+    .max(85, "Cannot exceed 85 SOL (graduation threshold)")
+    .default(0.1)
+    .describe("Initial SOL to buy after creation"),
+
+  slippageBps: z.number()
+    .min(0)
+    .max(5000, "Max slippage is 50%")
+    .default(500)
+    .describe("Slippage tolerance in basis points (500 = 5%)"),
+};
+
+// Response Type
+interface CreateTokenResponse {
+  success: boolean;
+  mintAddress?: string;
+  signature?: string;
+  explorerUrl?: string;
+  pumpfunUrl?: string;
+  tokensReceived?: string;
+  error?: string;
+}
+```
+
+#### buy-token
+
+```typescript
+const buyTokenSchema = {
+  mintAddress: z.string()
+    .length(44, "Invalid Solana address")
+    .describe("Token mint address"),
+
+  solAmount: z.number()
+    .positive("Amount must be positive")
+    .max(1000, "Max 1000 SOL per transaction")
+    .describe("Amount of SOL to spend"),
+
+  slippageBps: z.number()
+    .min(0)
+    .max(5000)
+    .default(500)
+    .describe("Slippage tolerance in basis points"),
+
+  priorityLevel: z.enum(["low", "medium", "high", "veryHigh"])
+    .default("high")
+    .describe("Transaction priority level"),
+};
+
+interface BuyTokenResponse {
+  success: boolean;
+  signature?: string;
+  tokensReceived?: string;
+  pricePerToken?: string;
+  totalCost?: string;
+  error?: string;
+}
+```
+
+#### sell-token
+
+```typescript
+const sellTokenSchema = {
+  mintAddress: z.string()
+    .length(44)
+    .describe("Token mint address"),
+
+  tokenAmount: z.number()
+    .positive()
+    .optional()
+    .describe("Amount of tokens to sell (mutually exclusive with percentage)"),
+
+  percentage: z.number()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe("Percentage of holdings to sell (1-100)"),
+
+  slippageBps: z.number()
+    .min(0)
+    .max(5000)
+    .default(500)
+    .describe("Slippage tolerance"),
+};
+
+interface SellTokenResponse {
+  success: boolean;
+  signature?: string;
+  solReceived?: string;
+  tokensSold?: string;
+  pricePerToken?: string;
+  error?: string;
+}
+```
+
+#### get-token-info
+
+```typescript
+const getTokenInfoSchema = {
+  mintAddress: z.string()
+    .length(44)
+    .describe("Token mint address"),
+};
+
+interface TokenInfo {
+  mint: string;
+  name: string;
+  symbol: string;
+  description: string;
+  imageUrl: string;
+  creator: string;
+  createdAt: string;
+  totalSupply: string;
+  decimals: number;
+  bondingCurveProgress: number;  // 0-100%
+  marketCap: string;
+  priceInSol: string;
+  priceInUsd: string;
+  holders: number;
+  isGraduated: boolean;
+  poolAddress?: string;  // PumpSwap/Raydium address if graduated
+}
+```
+
+#### get-bonding-curve
+
+```typescript
+const getBondingCurveSchema = {
+  mintAddress: z.string()
+    .length(44)
+    .describe("Token mint address"),
+};
+
+interface BondingCurveInfo {
+  mint: string;
+  bondingCurveAddress: string;
+  virtualTokenReserves: string;
+  virtualSolReserves: string;
+  realTokenReserves: string;
+  realSolReserves: string;
+  tokenTotalSupply: string;
+  complete: boolean;
+  creator: string;
+  progress: number;           // 0-100%
+  solToGraduation: string;    // SOL needed to graduate
+  tokensRemaining: string;    // Tokens left in curve
+  currentPrice: string;       // Current price per token in SOL
+  marketCap: string;          // Market cap in SOL
+}
+```
+
+#### get-balance
+
+```typescript
+const getBalanceSchema = {
+  address: z.string()
+    .length(44)
+    .optional()
+    .describe("Wallet address (defaults to configured wallet)"),
+
+  mintAddress: z.string()
+    .length(44)
+    .optional()
+    .describe("Specific token to check (omit for all tokens)"),
+};
+
+interface BalanceInfo {
+  address: string;
+  solBalance: string;
+  solBalanceUsd: string;
+  tokens: Array<{
+    mint: string;
+    symbol: string;
+    name: string;
+    balance: string;
+    valueInSol: string;
+    valueInUsd: string;
+  }>;
+  totalValueUsd: string;
+}
+
 ---
 
 ## Environment Configuration
@@ -682,6 +931,199 @@ async function withRetry<T>(
   throw new Error("Max retries exceeded");
 }
 ```
+
+### Pump.fun Program Error Codes
+
+| Code | Name | Description | User Message |
+|------|------|-------------|--------------|
+| 6000 | `NotAuthorized` | Caller not authorized | "You don't have permission for this action" |
+| 6001 | `AlreadyInitialized` | Account already initialized | "This token already exists" |
+| 6002 | `TooMuchSolRequired` | Insufficient SOL for operation | "Not enough SOL for this purchase" |
+| 6003 | `TooLittleSolReceived` | Slippage exceeded on sell | "Price changed too much, try higher slippage" |
+| 6004 | `MintDoesNotMatchBondingCurve` | Wrong mint for curve | "Invalid token address" |
+| 6005 | `BondingCurveComplete` | Curve already graduated | "Token has graduated, trade on PumpSwap" |
+| 6006 | `BondingCurveNotComplete` | Curve not yet graduated | "Token hasn't graduated yet" |
+| 6007 | `NotEnoughTokens` | Insufficient token balance | "You don't have enough tokens to sell" |
+| 6008 | `InvalidAmount` | Invalid amount specified | "Amount must be greater than zero" |
+
+### Error Code Mapping
+
+```typescript
+const PUMP_ERROR_MESSAGES: Record<number, string> = {
+  6000: "You don't have permission for this action",
+  6001: "This token already exists",
+  6002: "Not enough SOL for this purchase. Check your balance.",
+  6003: "Price changed too much. Try increasing slippage tolerance.",
+  6004: "Invalid token address. Please verify the mint address.",
+  6005: "This token has graduated! Trade on PumpSwap instead.",
+  6006: "Token hasn't graduated yet. Still on bonding curve.",
+  6007: "Insufficient token balance. You can't sell more than you own.",
+  6008: "Invalid amount. Must be greater than zero.",
+};
+
+function parseTransactionError(error: any): string {
+  // Check for program error
+  const match = error.message?.match(/custom program error: 0x([0-9a-f]+)/i);
+  if (match) {
+    const code = parseInt(match[1], 16);
+    return PUMP_ERROR_MESSAGES[code] || `Unknown error (code ${code})`;
+  }
+
+  // Check for common Solana errors
+  if (error.message?.includes("insufficient funds")) {
+    return "Insufficient SOL balance for transaction and fees";
+  }
+  if (error.message?.includes("blockhash not found")) {
+    return "Transaction expired. Please try again.";
+  }
+  if (error.message?.includes("rate limit")) {
+    return "Too many requests. Please wait and try again.";
+  }
+
+  return error.message || "Unknown error occurred";
+}
+```
+
+---
+
+## Testing Strategy
+
+### Devnet Testing Workflow
+
+#### 1. Environment Setup
+
+```bash
+# Create devnet wallet
+solana-keygen new --outfile ~/.config/solana/devnet-wallet.json
+
+# Configure for devnet
+solana config set --url devnet
+
+# Get devnet SOL (2 SOL per request, max 10 SOL)
+solana airdrop 2 --keypair ~/.config/solana/devnet-wallet.json
+
+# Verify balance
+solana balance --keypair ~/.config/solana/devnet-wallet.json
+```
+
+#### 2. Environment Variables for Testing
+
+```env
+# .env.test
+SOLANA_NETWORK=devnet
+HELIUS_RPC_URL=https://devnet.helius-rpc.com/?api-key=YOUR_KEY
+WALLET_PRIVATE_KEY=your_devnet_wallet_base58_key
+```
+
+#### 3. Test Cases
+
+```typescript
+// tests/createToken.test.ts
+describe("create-token", () => {
+  it("should create token with valid metadata", async () => {
+    const result = await tools.createToken({
+      name: "Test Token",
+      symbol: "TEST",
+      description: "A test token",
+      initialBuySol: 0.01,
+    });
+    expect(result.success).toBe(true);
+    expect(result.mintAddress).toBeDefined();
+  });
+
+  it("should reject name > 32 characters", async () => {
+    const result = await tools.createToken({
+      name: "A".repeat(33),
+      symbol: "TEST",
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("32 characters");
+  });
+
+  it("should handle insufficient balance", async () => {
+    const result = await tools.createToken({
+      name: "Test",
+      symbol: "TEST",
+      initialBuySol: 1000, // More than wallet has
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Insufficient");
+  });
+});
+
+// tests/buyToken.test.ts
+describe("buy-token", () => {
+  const testMint = "..."; // Use token created in previous test
+
+  it("should buy tokens successfully", async () => {
+    const result = await tools.buyToken({
+      mintAddress: testMint,
+      solAmount: 0.01,
+      slippageBps: 500,
+    });
+    expect(result.success).toBe(true);
+    expect(result.tokensReceived).toBeDefined();
+  });
+
+  it("should fail with invalid mint address", async () => {
+    const result = await tools.buyToken({
+      mintAddress: "invalid",
+      solAmount: 0.01,
+    });
+    expect(result.success).toBe(false);
+  });
+});
+```
+
+#### 4. Integration Test Script
+
+```bash
+#!/bin/bash
+# scripts/test-devnet.sh
+
+echo "🚀 ClaudeCandle Devnet Integration Tests"
+echo "========================================"
+
+# Check devnet balance
+BALANCE=$(solana balance --url devnet)
+echo "💰 Devnet Balance: $BALANCE"
+
+if [[ $(echo "$BALANCE" | cut -d' ' -f1) < 0.1 ]]; then
+  echo "⚠️  Low balance, requesting airdrop..."
+  solana airdrop 2 --url devnet
+fi
+
+# Run tests
+echo "🧪 Running tests..."
+npm test -- --coverage
+
+echo "✅ Tests complete!"
+```
+
+### Manual Testing Checklist
+
+- [ ] **Create Token**
+  - [ ] With all metadata fields
+  - [ ] With minimal fields (name, symbol only)
+  - [ ] With invalid inputs (should fail gracefully)
+  - [ ] With image URL
+  - [ ] Without image URL
+
+- [ ] **Buy Token**
+  - [ ] Small amount (0.001 SOL)
+  - [ ] With different slippage values
+  - [ ] On graduated token (should use PumpSwap)
+
+- [ ] **Sell Token**
+  - [ ] Partial sell (50%)
+  - [ ] Full sell (100%)
+  - [ ] More than balance (should fail)
+
+- [ ] **Query Tools**
+  - [ ] Get info for valid token
+  - [ ] Get info for invalid address
+  - [ ] Get bonding curve status
+  - [ ] Get balance
 
 ---
 
