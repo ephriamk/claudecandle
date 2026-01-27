@@ -1,35 +1,30 @@
 import { PublicKey } from "@solana/web3.js";
 
 /**
- * Pump.fun Program IDs and Constants
- * Reference: https://github.com/pump-fun/pump-public-docs
+ * Bags.fm / Meteora DBC Program IDs and Constants
+ * Reference: https://docs.bags.fm/principles/program-ids
  */
 
 // =============================================================================
 // Program IDs
 // =============================================================================
 
-/** Main Pump.fun bonding curve program */
-export const PUMP_PROGRAM_ID = new PublicKey(
-  "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+/** Meteora Dynamic Bonding Curve program (used by Bags.fm) */
+export const METEORA_DBC_PROGRAM_ID = new PublicKey(
+  "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN"
 );
 
-/** PumpSwap AMM program (for graduated tokens) */
-export const PUMP_SWAP_PROGRAM_ID = new PublicKey(
-  "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
+/** Bags.fm AMM program (for graduated tokens) */
+export const BAGS_AMM_PROGRAM_ID = new PublicKey(
+  "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG"
 );
 
-/** Mayhem Mode program */
-export const MAYHEM_PROGRAM_ID = new PublicKey(
-  "MAyhSmzXzV1pTf7LsNkrNwkWKTo4ougAJ1PPg47MD4e"
+/** Bags.fm Address Lookup Table (for transaction optimization) */
+export const BAGS_LUT_ADDRESS = new PublicKey(
+  "Eq1EVs15EAWww1YtPTtWPzJRLPJoS6VYP9oW9SbNr3yp"
 );
 
-/** Fee program */
-export const FEE_PROGRAM_ID = new PublicKey(
-  "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ"
-);
-
-/** Token2022 program (used by pump.fun create_v2) */
+/** Token2022 program */
 export const TOKEN_2022_PROGRAM_ID = new PublicKey(
   "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 );
@@ -49,38 +44,17 @@ export const METADATA_PROGRAM_ID = new PublicKey(
   "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
 );
 
-// =============================================================================
-// PDA Seeds
-// =============================================================================
-
-export const PDA_SEEDS = {
-  GLOBAL: "global",
-  MINT_AUTHORITY: "mint-authority",
-  BONDING_CURVE: "bonding-curve",
-  METADATA: "metadata",
-} as const;
+/** Wrapped SOL mint address */
+export const WSOL_MINT = new PublicKey(
+  "So11111111111111111111111111111111111111112"
+);
 
 // =============================================================================
-// Bonding Curve Constants
+// Token Constants
 // =============================================================================
 
-/** Initial virtual token reserves (for pricing) */
-export const INITIAL_VIRTUAL_TOKEN_RESERVES = BigInt("1073000000000000");
-
-/** Initial virtual SOL reserves (for pricing) */
-export const INITIAL_VIRTUAL_SOL_RESERVES = BigInt("30000000000");
-
-/** Initial real token reserves (actual tokens available) */
-export const INITIAL_REAL_TOKEN_RESERVES = BigInt("793100000000000");
-
-/** Total token supply (1 billion with 6 decimals) */
-export const TOKEN_TOTAL_SUPPLY = BigInt("1000000000000000");
-
-/** Token decimals */
+/** Default token decimals on Bags.fm */
 export const TOKEN_DECIMALS = 6;
-
-/** SOL needed for graduation (approximately) */
-export const GRADUATION_SOL_THRESHOLD = 85;
 
 /** Lamports per SOL */
 export const LAMPORTS_PER_SOL = 1_000_000_000;
@@ -89,14 +63,11 @@ export const LAMPORTS_PER_SOL = 1_000_000_000;
 // Fee Constants
 // =============================================================================
 
-/** Trading fee in basis points (1% = 100 bps) */
-export const TRADING_FEE_BPS = 100;
+/** Creator fee in basis points (1% of trading volume forever) */
+export const CREATOR_FEE_BPS = 100;
 
-/** Migration fee in SOL */
-export const MIGRATION_FEE_SOL = 1.5;
-
-/** Creator reward on graduation */
-export const CREATOR_REWARD_SOL = 0.5;
+/** Full fee share (100% = 10000 bps) */
+export const FULL_FEE_SHARE_BPS = 10000;
 
 // =============================================================================
 // Transaction Defaults
@@ -147,8 +118,10 @@ export type NetworkName = keyof typeof RPC_ENDPOINTS;
 // =============================================================================
 
 export const URLS = {
-  PUMP_FUN: "https://pump.fun",
-  PUMP_FUN_API: "https://pump.fun/api",
+  BAGS_FM: "https://bags.fm",
+  BAGS_FM_TOKEN: "https://bags.fm/token",
+  BAGS_FM_LAUNCH: "https://bags.fm/launch",
+  BAGS_DEV_PORTAL: "https://dev.bags.fm",
   SOLSCAN_TOKEN: "https://solscan.io/token",
   SOLSCAN_TX: "https://solscan.io/tx",
   EXPLORER_TOKEN: "https://explorer.solana.com/address",
@@ -156,29 +129,18 @@ export const URLS = {
 } as const;
 
 // =============================================================================
-// Error Codes (Pump.fun Program)
+// Error Messages
 // =============================================================================
 
-export const PUMP_ERROR_CODES = {
-  6000: "NotAuthorized",
-  6001: "AlreadyInitialized",
-  6002: "TooMuchSolRequired",
-  6003: "TooLittleSolReceived",
-  6004: "MintDoesNotMatchBondingCurve",
-  6005: "BondingCurveComplete",
-  6006: "BondingCurveNotComplete",
-  6007: "NotEnoughTokens",
-  6008: "InvalidAmount",
+export const ERROR_MESSAGES = {
+  NO_API_KEY: "BAGS_API_KEY is required. Get your key from https://dev.bags.fm",
+  NO_WALLET: "Wallet not configured. Set WALLET_PRIVATE_KEY in .env",
+  INSUFFICIENT_SOL: "Insufficient SOL balance for this transaction",
+  INSUFFICIENT_TOKENS: "Insufficient token balance",
+  INVALID_MINT: "Invalid token mint address",
+  INVALID_AMOUNT: "Amount must be greater than zero",
+  SLIPPAGE_EXCEEDED: "Price changed too much. Try increasing slippage tolerance.",
+  TOKEN_NOT_FOUND: "Token not found on Bags.fm",
+  QUOTE_FAILED: "Failed to get trade quote. Check token liquidity.",
+  TRANSACTION_FAILED: "Transaction failed. Please try again.",
 } as const;
-
-export const PUMP_ERROR_MESSAGES: Record<number, string> = {
-  6000: "You don't have permission for this action",
-  6001: "This token already exists",
-  6002: "Not enough SOL for this purchase. Check your balance.",
-  6003: "Price changed too much. Try increasing slippage tolerance.",
-  6004: "Invalid token address. Please verify the mint address.",
-  6005: "This token has graduated! Trade on PumpSwap instead.",
-  6006: "Token hasn't graduated yet. Still on bonding curve.",
-  6007: "Insufficient token balance. You can't sell more than you own.",
-  6008: "Invalid amount. Must be greater than zero.",
-};

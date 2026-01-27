@@ -1,4 +1,7 @@
-import { PublicKey } from "@solana/web3.js";
+/**
+ * ClaudeCandle Type Definitions
+ * Types for Bags.fm integration via MCP server
+ */
 
 // =============================================================================
 // Tool Response Types
@@ -8,6 +11,21 @@ export interface ToolResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
+}
+
+// =============================================================================
+// Fee Share Types (Bags.fm Creator Royalties)
+// =============================================================================
+
+export interface FeeShare {
+  wallet: string;
+  percentage: number; // Percentage (0-100), not basis points
+}
+
+export interface FeeClaimer {
+  provider: string; // e.g., "twitter", "telegram"
+  username: string;
+  bps: number; // Basis points (10000 = 100%)
 }
 
 // =============================================================================
@@ -24,13 +42,14 @@ export interface CreateTokenParams {
   website?: string;
   initialBuySol?: number;
   slippageBps?: number;
+  feeShares?: FeeShare[];
 }
 
 export interface CreateTokenResult {
   mintAddress: string;
   signature: string;
   explorerUrl: string;
-  pumpfunUrl: string;
+  bagsfmUrl: string;
   tokensReceived?: string;
 }
 
@@ -38,7 +57,6 @@ export interface BuyTokenParams {
   mintAddress: string;
   solAmount: number;
   slippageBps?: number;
-  priorityLevel?: "low" | "medium" | "high" | "veryHigh";
 }
 
 export interface BuyTokenResult {
@@ -87,19 +105,12 @@ export interface TokenInfo {
 
 export interface BondingCurveInfo {
   mint: string;
-  bondingCurveAddress: string;
-  virtualTokenReserves: string;
-  virtualSolReserves: string;
-  realTokenReserves: string;
-  realSolReserves: string;
-  tokenTotalSupply: string;
-  complete: boolean;
-  creator: string;
+  curveAddress: string;
   progress: number;
-  solToGraduation: string;
-  tokensRemaining: string;
   currentPrice: string;
   marketCap: string;
+  isComplete: boolean;
+  creator?: string;
 }
 
 export interface TokenBalance {
@@ -123,19 +134,17 @@ export interface WalletBalance {
 }
 
 // =============================================================================
-// Bonding Curve Account Structure
+// Trade Quote Types
 // =============================================================================
 
-export interface BondingCurveAccount {
-  discriminator: bigint;
-  virtualTokenReserves: bigint;
-  virtualSolReserves: bigint;
-  realTokenReserves: bigint;
-  realSolReserves: bigint;
-  tokenTotalSupply: bigint;
-  complete: boolean;
-  creator: PublicKey;
-  isMayhemMode?: boolean;
+export interface TradeQuote {
+  inputMint: string;
+  outputMint: string;
+  inputAmount: string;
+  expectedOutput: string;
+  minOutput: string;
+  priceImpact: number;
+  route?: string[];
 }
 
 // =============================================================================
@@ -143,10 +152,10 @@ export interface BondingCurveAccount {
 // =============================================================================
 
 export interface AppConfig {
+  bagsApiKey: string;
   rpcUrl: string;
-  network: "mainnet-beta" | "devnet" | "testnet";
+  network: "mainnet-beta" | "devnet";
   defaultSlippageBps: number;
-  defaultPriorityLevel: "low" | "medium" | "high" | "veryHigh";
   logLevel: "debug" | "info" | "warn" | "error";
 }
 

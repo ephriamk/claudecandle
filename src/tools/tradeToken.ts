@@ -1,25 +1,23 @@
-import {
-  PublicKey,
-  Keypair,
-  Transaction,
-} from "@solana/web3.js";
-import {
-  getAssociatedTokenAddressSync,
-  TOKEN_2022_PROGRAM_ID,
-  getAccount,
-} from "@solana/spl-token";
+/**
+ * Trade Token Tools
+ * Buy and sell tokens on Bags.fm using the Bags SDK
+ */
+
+import { PublicKey } from "@solana/web3.js";
 import { z } from "zod";
+import { getBagsSDK } from "../services/bags.js";
 import {
   getConnection,
-  getBondingCurveAddress,
+  getSolBalance,
+  getTokenBalance,
   solToLamports,
   lamportsToSol,
-  formatTokenAmount,
 } from "../services/solana.js";
 import { loadKeypair, isValidSolanaAddress } from "../utils/keypair.js";
 import {
   DEFAULT_SLIPPAGE_BPS,
-  TOKEN_DECIMALS,
+  WSOL_MINT,
+  ERROR_MESSAGES,
 } from "../config/constants.js";
 import type {
   BuyTokenResult,
@@ -77,98 +75,6 @@ export type BuyTokenSchemaType = z.infer<z.ZodObject<typeof buyTokenSchema>>;
 export type SellTokenSchemaType = z.infer<z.ZodObject<typeof sellTokenSchema>>;
 
 // =============================================================================
-// PumpPortal Trade API
-// =============================================================================
-
-interface TradeResult {
-  signature: string;
-  tokenAmount?: string;
-  solAmount?: string;
-}
-
-/**
- * Execute trade via PumpPortal API
- */
-async function executeTradeViaPumpPortal(
-  action: "buy" | "sell",
-  mintAddress: string,
-  amount: number,
-  slippageBps: number,
-  wallet: Keypair,
-  denominatedInSol: boolean = true
-): Promise<ToolResponse<TradeResult>> {
-  try {
-    const response = await fetch("https://pumpportal.fun/api/trade-local", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        publicKey: wallet.publicKey.toBase58(),
-        action,
-        mint: mintAddress,
-        denominatedInSol: denominatedInSol ? "true" : "false",
-        amount,
-        slippage: slippageBps / 100,
-        priorityFee: 0.0005,
-        pool: "pump",
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-
-      // Check if token has graduated
-      if (errorText.includes("graduated") || errorText.includes("complete")) {
-        return {
-          success: false,
-          error: "This token has graduated! Trade on PumpSwap or Raydium instead.",
-        };
-      }
-
-      return {
-        success: false,
-        error: `Trade API error: ${errorText}`,
-      };
-    }
-
-    // Get the serialized transaction
-    const txData = await response.arrayBuffer();
-    const tx = Transaction.from(Buffer.from(txData));
-
-    // Sign and send
-    const conn = getConnection();
-    const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash();
-    tx.recentBlockhash = blockhash;
-    tx.feePayer = wallet.publicKey;
-    tx.sign(wallet);
-
-    const signature = await conn.sendRawTransaction(tx.serialize(), {
-      skipPreflight: false,
-      preflightCommitment: "confirmed",
-    });
-
-    await conn.confirmTransaction({
-      signature,
-      blockhash,
-      lastValidBlockHeight,
-    }, "confirmed");
-
-    return {
-      success: true,
-      data: {
-        signature,
-      },
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : `Failed to ${action} token`,
-    };
-  }
-}
-
-// =============================================================================
 // Buy Token
 // =============================================================================
 
@@ -180,7 +86,7 @@ export async function buyToken(
     if (!isValidSolanaAddress(params.mintAddress)) {
       return {
         success: false,
-        error: "Invalid mint address format",
+        error: ERROR_MESSAGES.INVALID_MINT,
       };
     }
 
@@ -188,72 +94,86 @@ export async function buyToken(
     const conn = getConnection();
 
     // Check SOL balance
-    const balance = await conn.getBalance(wallet.publicKey);
-    const requiredLamports = solToLamports(params.solAmount + 0.01); // Add buffer for fees
+    const balance = await getSolBalance(wallet.publicKey);
+    const minRequired = params.solAmount + 0.01; // Buffer for fees
 
-    if (BigInt(balance) < requiredLamports) {
+    if (balance < minRequired) {
       return {
         success: false,
-        error: `Insufficient SOL balance. Have ${lamportsToSol(balance).toFixed(4)} SOL, need ~${params.solAmount + 0.01} SOL`,
-      };
-    }
-
-    // Check if token exists and get bonding curve status
-    const mint = new PublicKey(params.mintAddress);
-    const bondingCurve = getBondingCurveAddress(mint);
-    const bondingCurveInfo = await conn.getAccountInfo(bondingCurve);
-
-    if (!bondingCurveInfo) {
-      return {
-        success: false,
-        error: "Token not found on pump.fun. Check the mint address.",
+        error: `${ERROR_MESSAGES.INSUFFICIENT_SOL}. Have ${balance.toFixed(4)} SOL, need ~${minRequired.toFixed(4)} SOL`,
       };
     }
 
     console.error(`Buying ${params.solAmount} SOL of token ${params.mintAddress}`);
 
-    // Execute buy via PumpPortal
-    const result = await executeTradeViaPumpPortal(
-      "buy",
-      params.mintAddress,
-      params.solAmount,
-      params.slippageBps,
-      wallet,
-      true // denominatedInSol
-    );
+    // Initialize Bags SDK
+    const sdk = getBagsSDK();
 
-    if (!result.success) {
-      return result as ToolResponse<BuyTokenResult>;
+    // Get trade quote (SOL -> Token)
+    // SDK expects amount as number (lamports)
+    const amountLamports = Number(solToLamports(params.solAmount));
+    const quote = await sdk.trade.getQuote({
+      inputMint: WSOL_MINT,
+      outputMint: new PublicKey(params.mintAddress),
+      amount: amountLamports,
+      slippageMode: "manual",
+      slippageBps: params.slippageBps,
+    });
+
+    if (!quote) {
+      return {
+        success: false,
+        error: ERROR_MESSAGES.QUOTE_FAILED,
+      };
     }
 
-    // Get token balance after purchase
-    let tokensReceived = "Unknown";
-    try {
-      const ata = getAssociatedTokenAddressSync(
-        mint,
-        wallet.publicKey,
-        false,
-        TOKEN_2022_PROGRAM_ID
-      );
-      const account = await getAccount(conn, ata, "confirmed", TOKEN_2022_PROGRAM_ID);
-      tokensReceived = formatTokenAmount(account.amount, TOKEN_DECIMALS);
-    } catch {
-      // Token account might not exist yet or other error
-    }
+    // Create swap transaction with quote response and user public key
+    const swapResult = await sdk.trade.createSwapTransaction({
+      quoteResponse: quote,
+      userPublicKey: wallet.publicKey,
+    });
+
+    // Sign the VersionedTransaction and send
+    swapResult.transaction.sign([wallet]);
+    const signature = await conn.sendRawTransaction(swapResult.transaction.serialize(), {
+      skipPreflight: false,
+      preflightCommitment: "confirmed",
+    });
+
+    // Wait for confirmation using lastValidBlockHeight from swap result
+    const { blockhash } = await conn.getLatestBlockhash();
+    await conn.confirmTransaction({
+      signature,
+      blockhash,
+      lastValidBlockHeight: swapResult.lastValidBlockHeight,
+    }, "confirmed");
+
+    // Get expected output from quote
+    console.error(`Buy successful: ${signature}`);
 
     return {
       success: true,
       data: {
-        signature: result.data!.signature,
-        tokensReceived,
-        pricePerToken: "See transaction",
+        signature,
+        tokensReceived: quote.outAmount,
+        pricePerToken: quote.priceImpactPct ? `${quote.priceImpactPct}% impact` : "See transaction",
         totalCost: `${params.solAmount} SOL`,
       },
     };
   } catch (error) {
+    console.error("Buy token error:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    if (errorMessage.includes("slippage") || errorMessage.includes("Slippage")) {
+      return {
+        success: false,
+        error: ERROR_MESSAGES.SLIPPAGE_EXCEEDED,
+      };
+    }
+
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to buy token",
+      error: `Buy failed: ${errorMessage}`,
     };
   }
 }
@@ -270,7 +190,7 @@ export async function sellToken(
     if (!isValidSolanaAddress(params.mintAddress)) {
       return {
         success: false,
-        error: "Invalid mint address format",
+        error: ERROR_MESSAGES.INVALID_MINT,
       };
     }
 
@@ -294,79 +214,108 @@ export async function sellToken(
     const mint = new PublicKey(params.mintAddress);
 
     // Get current token balance
-    let currentBalance: bigint;
-    try {
-      const ata = getAssociatedTokenAddressSync(
-        mint,
-        wallet.publicKey,
-        false,
-        TOKEN_2022_PROGRAM_ID
-      );
-      const account = await getAccount(conn, ata, "confirmed", TOKEN_2022_PROGRAM_ID);
-      currentBalance = account.amount;
-    } catch {
-      return {
-        success: false,
-        error: "You don't have any of this token to sell",
-      };
-    }
+    const balanceInfo = await getTokenBalance(wallet.publicKey, mint);
 
-    if (currentBalance === BigInt(0)) {
+    if (!balanceInfo || balanceInfo.balanceRaw === BigInt(0)) {
       return {
         success: false,
-        error: "Token balance is zero",
+        error: ERROR_MESSAGES.INSUFFICIENT_TOKENS,
       };
     }
 
     // Calculate amount to sell
-    let sellAmount: number;
+    let sellAmountRaw: bigint;
 
     if (params.percentage) {
       // Calculate based on percentage
-      const percentageAmount = (currentBalance * BigInt(params.percentage)) / BigInt(100);
-      sellAmount = Number(percentageAmount) / Math.pow(10, TOKEN_DECIMALS);
+      sellAmountRaw = (balanceInfo.balanceRaw * BigInt(params.percentage)) / BigInt(100);
     } else {
-      sellAmount = params.tokenAmount!;
+      sellAmountRaw = BigInt(Math.floor(params.tokenAmount! * Math.pow(10, balanceInfo.decimals)));
 
       // Validate we have enough tokens
-      const sellAmountRaw = BigInt(Math.floor(sellAmount * Math.pow(10, TOKEN_DECIMALS)));
-      if (sellAmountRaw > currentBalance) {
+      if (sellAmountRaw > balanceInfo.balanceRaw) {
         return {
           success: false,
-          error: `Insufficient balance. Have ${formatTokenAmount(currentBalance, TOKEN_DECIMALS)} tokens, trying to sell ${sellAmount}`,
+          error: `${ERROR_MESSAGES.INSUFFICIENT_TOKENS}. Have ${balanceInfo.balance.toFixed(4)}, trying to sell ${params.tokenAmount}`,
         };
       }
     }
 
+    const sellAmount = Number(sellAmountRaw) / Math.pow(10, balanceInfo.decimals);
     console.error(`Selling ${sellAmount} tokens of ${params.mintAddress}`);
 
-    // Execute sell via PumpPortal
-    const result = await executeTradeViaPumpPortal(
-      "sell",
-      params.mintAddress,
-      sellAmount,
-      params.slippageBps,
-      wallet,
-      false // denominatedInSol = false, amount is in tokens
-    );
+    // Initialize Bags SDK
+    const sdk = getBagsSDK();
 
-    if (!result.success) {
-      return result as ToolResponse<SellTokenResult>;
+    // Get trade quote (Token -> SOL)
+    // SDK expects amount as number
+    const sellAmountNum = Number(sellAmountRaw);
+    const quote = await sdk.trade.getQuote({
+      inputMint: mint,
+      outputMint: WSOL_MINT,
+      amount: sellAmountNum,
+      slippageMode: "manual",
+      slippageBps: params.slippageBps,
+    });
+
+    if (!quote) {
+      return {
+        success: false,
+        error: ERROR_MESSAGES.QUOTE_FAILED,
+      };
     }
+
+    // Create swap transaction with quote response and user public key
+    const swapResult = await sdk.trade.createSwapTransaction({
+      quoteResponse: quote,
+      userPublicKey: wallet.publicKey,
+    });
+
+    // Sign the VersionedTransaction and send
+    swapResult.transaction.sign([wallet]);
+    const signature = await conn.sendRawTransaction(swapResult.transaction.serialize(), {
+      skipPreflight: false,
+      preflightCommitment: "confirmed",
+    });
+
+    // Wait for confirmation using lastValidBlockHeight from swap result
+    const { blockhash } = await conn.getLatestBlockhash();
+    await conn.confirmTransaction({
+      signature,
+      blockhash,
+      lastValidBlockHeight: swapResult.lastValidBlockHeight,
+    }, "confirmed");
+
+    // Get expected output from quote (outAmount is in lamports as string)
+    const solReceivedFormatted = quote.outAmount
+      ? lamportsToSol(BigInt(quote.outAmount)).toFixed(6)
+      : "See transaction";
+
+    console.error(`Sell successful: ${signature}`);
 
     return {
       success: true,
       data: {
-        signature: result.data!.signature,
-        solReceived: "See transaction",
+        signature,
+        solReceived: `${solReceivedFormatted} SOL`,
         tokensSold: sellAmount.toString(),
-        pricePerToken: "See transaction",
+        pricePerToken: quote.priceImpactPct ? `${quote.priceImpactPct}% impact` : "See transaction",
       },
     };
   } catch (error) {
+    console.error("Sell token error:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    if (errorMessage.includes("slippage") || errorMessage.includes("Slippage")) {
+      return {
+        success: false,
+        error: ERROR_MESSAGES.SLIPPAGE_EXCEEDED,
+      };
+    }
+
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to sell token",
+      error: `Sell failed: ${errorMessage}`,
     };
   }
 }
@@ -375,24 +324,26 @@ export async function sellToken(
 // Tool Descriptions
 // =============================================================================
 
-export const buyTokenDescription = `Buy tokens from a pump.fun bonding curve.
+export const buyTokenDescription = `Buy tokens on Bags.fm.
 
-Spends SOL to buy tokens at the current bonding curve price.
-Price increases as more tokens are bought (bonding curve mechanics).
+Spends SOL to buy tokens at the current market price via Bags.fm's trading infrastructure.
 
 **Parameters:**
 - mintAddress: The token's mint address
-- solAmount: How much SOL to spend
+- solAmount: How much SOL to spend (max 100 SOL)
 - slippageBps: Slippage tolerance (default 5%)
 
+**Features:**
+- Routes through best available liquidity
+- Automatic slippage protection
+- Creator earns fees on every trade
+
 **Requirements:**
-- Token must still be on bonding curve (not graduated)
-- Sufficient SOL balance for purchase + fees`;
+- Sufficient SOL balance for purchase + fees (~0.01 SOL)`;
 
-export const sellTokenDescription = `Sell tokens back to a pump.fun bonding curve.
+export const sellTokenDescription = `Sell tokens on Bags.fm.
 
-Sells tokens to receive SOL at the current bonding curve price.
-Price decreases as more tokens are sold.
+Sells tokens to receive SOL at the current market price.
 
 **Parameters:**
 - mintAddress: The token's mint address
@@ -400,6 +351,10 @@ Price decreases as more tokens are sold.
 - percentage: Sell a percentage of holdings (1-100)
 - slippageBps: Slippage tolerance (default 5%)
 
+**Features:**
+- Routes through best available liquidity
+- Automatic slippage protection
+- Percentage selling for easy position management
+
 **Requirements:**
-- Token must still be on bonding curve (not graduated)
 - Must have tokens in wallet to sell`;

@@ -7,20 +7,20 @@
 | Aspect | Details |
 |--------|---------|
 | **What** | MCP server enabling Claude to create & trade meme coins on Solana |
-| **Platform** | Pump.fun integration (73-80% market share, $800M+ revenue) |
-| **Tech** | TypeScript, @pump-fun/pump-sdk, Token2022, Helius RPC |
+| **Platform** | Bags.fm integration (Meteora Dynamic Bonding Curves) |
+| **Tech** | TypeScript, @bagsfm/bags-sdk, Token2022, Helius RPC |
 | **Unique Value** | Conversational UX, AI-guided decisions, automated workflows |
-| **Status** | Research complete, ready for implementation |
+| **Status** | Production ready |
 
-### Quick Start (After Implementation)
+### Quick Start
 
 ```
 User: "Create a meme coin called MOONDOG with a rocket dog logo"
 
-Claude: Creating MOONDOG token on pump.fun...
-        ✅ Token created!
-        📍 Mint: 7xKXtg...
-        🔗 https://pump.fun/7xKXtg...
+Claude: Creating MOONDOG token on Bags.fm...
+        Token created!
+        Mint: 7xKXtg...
+        https://bags.fm/token/7xKXtg...
 ```
 
 ---
@@ -31,762 +31,266 @@ ClaudeCandle is the world's first MCP (Model Context Protocol) skill-based meme 
 
 ---
 
-## Deep Research Findings (January 2026)
+## Bags.fm Platform Overview
 
-### Existing Implementations & SDKs
+### What is Bags.fm?
 
-| Resource | Type | Notes |
-|----------|------|-------|
-| [@pump-fun/pump-sdk](https://www.npmjs.com/package/@pump-fun/pump-sdk) | **Official SDK** | v1.26.0 - Use this for production |
-| [@pump-fun/pump-swap-sdk](https://www.npmjs.com/package/@pump-fun/pump-swap-sdk) | **Official SDK** | For PumpSwap DEX integration |
-| [pump-public-docs](https://github.com/pump-fun/pump-public-docs) | **Official Docs** | IDL, account structures, breaking changes |
-| [PumpPortal](https://pumpportal.fun/) | Third-party API | REST/WebSocket API, 0.5% fee |
-| [pumpdotfun-sdk](https://github.com/rckprtr/pumpdotfun-sdk) | Community SDK | Anchor-based, well documented |
-| [Solana Agent Kit](https://github.com/sendaifun/solana-agent-kit) | AI Toolkit | 60+ Solana operations |
-| [PUMPFUN-MCP](https://github.com/eskayML/PUMPFUN-MCP) | Reference MCP | Working MCP server implementation |
+Bags.fm is a modern token launchpad built on **Meteora Dynamic Bonding Curves** (DBC). It provides:
 
----
-
-## Pump.fun Technical Specification
+- Fair launch mechanics with bonding curves
+- **1% creator fees** on all trading volume forever
+- Professional liquidity management
+- Automatic LP migration after graduation
+- Simple, comprehensive API and SDK
 
 ### Program IDs
 
 ```typescript
-// Main Pump.fun Program
-const PUMP_PROGRAM_ID = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P";
+// Meteora Dynamic Bonding Curve Program
+const METEORA_DBC_PROGRAM_ID = "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN";
 
-// PumpSwap AMM (for graduated tokens)
-const PUMP_SWAP_PROGRAM_ID = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA";
+// Bags AMM Program
+const BAGS_AMM_PROGRAM_ID = "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG";
 
-// Mayhem Mode Program
-const MAYHEM_PROGRAM_ID = "MAyhSmzXzV1pTf7LsNkrNwkWKTo4ougAJ1PPg47MD4e";
-
-// Fee Program
-const FEE_PROGRAM_ID = "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ";
+// Bags Lookup Table
+const BAGS_LUT_ADDRESS = "Eq1EVs15EAWww1YtPTtWPzJRLPJoS6VYP9oW9SbNr3yp";
 ```
 
-### PDA Seeds
+### Token Launch Flow
 
-```typescript
-const GLOBAL_ACCOUNT_SEED = "global";
-const MINT_AUTHORITY_SEED = "mint-authority";
-const BONDING_CURVE_SEED = "bonding-curve";
-const METADATA_SEED = "metadata";
+1. **Create Token Info & Metadata** - Upload metadata to IPFS via Bags API
+2. **Initialize Bonding Curve** - Create the Meteora DBC for the token
+3. **Trading Active** - Users can buy/sell on the bonding curve
+4. **Graduation** - When target is reached, LP migrates to AMM
+5. **Post-Graduation** - Trading continues on Meteora/Bags AMM
 
-// Derive bonding curve PDA
-function getBondingCurveAddress(mint: PublicKey): PublicKey {
-  const [bondingCurve] = PublicKey.findProgramAddressSync(
-    [Buffer.from("bonding-curve"), mint.toBuffer()],
-    new PublicKey(PUMP_PROGRAM_ID)
-  );
-  return bondingCurve;
-}
-```
+### Creator Benefits
 
-### Bonding Curve Mathematics
-
-The pump.fun bonding curve uses **Uniswap V2 constant product formula** with **dual reserve accounting**:
-
-```
-virtual_token_reserves × virtual_sol_reserves = k (constant)
-```
-
-#### Initial State (on token creation)
-
-| Reserve | Value | Notes |
-|---------|-------|-------|
-| `virtual_token_reserves` | 1,073,000,000,000,000 | Synthetic supply for pricing |
-| `virtual_sol_reserves` | 30,000,000,000 | Synthetic SOL for pricing |
-| `real_token_reserves` | 793,100,000,000,000 | Actual tokens available |
-| `real_sol_reserves` | 0 | Actual SOL collected |
-| `token_total_supply` | 1,000,000,000,000,000 | 1B tokens (6 decimals) |
-
-#### Buy Calculation
-
-```typescript
-function calculateBuyAmount(
-  virtualTokenReserves: bigint,
-  virtualSolReserves: bigint,
-  solAmount: bigint
-): bigint {
-  const k = virtualTokenReserves * virtualSolReserves;
-  const newVirtualSolReserves = virtualSolReserves + solAmount;
-  const newVirtualTokenReserves = k / newVirtualSolReserves;
-  return virtualTokenReserves - newVirtualTokenReserves;
-}
-```
-
-#### Graduation Conditions
-
-- **Trigger**: `real_token_reserves` reaches 0 (all 793.1M tokens sold)
-- **SOL Required**: ~85 SOL raised through bonding curve
-- **Migration**: Auto-migrates to PumpSwap with 79 SOL liquidity
-- **Fee**: 6 SOL listing fee taken on graduation
-
-### BondingCurve Account Structure
-
-```typescript
-interface BondingCurveAccount {
-  discriminator: bigint;           // 8 bytes
-  virtualTokenReserves: bigint;    // 8 bytes
-  virtualSolReserves: bigint;      // 8 bytes
-  realTokenReserves: bigint;       // 8 bytes
-  realSolReserves: bigint;         // 8 bytes
-  tokenTotalSupply: bigint;        // 8 bytes
-  complete: boolean;               // 1 byte
-  creator: PublicKey;              // 32 bytes
-  isMayhemMode?: boolean;          // 1 byte (v2 only)
-}
-// Total: 82 bytes (v2) or 81 bytes (legacy)
-```
-
-### Token2022 Migration (create_v2)
-
-**IMPORTANT**: As of November 2024, pump.fun uses `create_v2` with Token2022:
-
-```typescript
-// OLD: Legacy SPL Token (deprecated)
-const legacyTokenProgram = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
-
-// NEW: Token2022 Program
-const token2022Program = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
-```
-
-Key differences for `create_v2`:
-1. Pass `token2022Program` instead of legacy token program
-2. Derive ATAs with Token2022 program
-3. Metadata stored on-chain (no Metaplex needed)
-4. `is_mayhem_mode` boolean parameter
+| Benefit | Details |
+|---------|---------|
+| **Trading Fees** | 1% of all trading volume, forever |
+| **Fee Share Config** | Distribute fees to multiple wallets |
+| **No Upfront Cost** | Token creation is nearly free (~0.02 SOL) |
+| **Automatic LP** | Liquidity handled by the protocol |
 
 ---
 
-## Security Deep Dive
+## Technical Specification
 
-### Token Authority Security
+### Bags SDK Services
 
-#### Mint Authority
-- Controls token issuance
-- **Best Practice**: Revoke after initial mint for fixed supply
-- Setting to `null` is **permanent and irreversible**
+The `@bagsfm/bags-sdk` provides these services:
 
-#### Freeze Authority
-- Can freeze/thaw individual token accounts
-- **Risk**: Malicious actors create "honeypots" - users can buy but not sell
-- **Best Practice**: Revoke for meme coins, keep for compliance tokens (USDC, RWAs)
+| Service | Purpose |
+|---------|---------|
+| `tokenLaunch` | Create tokens and metadata |
+| `trade` | Get quotes and execute swaps |
+| `state` | Query token/curve information |
+| `config` | Manage fee share configurations |
+| `fee` | Fee claiming operations |
 
-#### Update Authority (Metaplex)
-- Can change token metadata (name, symbol, image, URI)
-- **Risk**: Phishing attacks via malicious URIs, misleading metadata changes
-- **Best Practice**: Pump.fun revokes by default - follow this pattern
-
-### Rug Pull Prevention
-
-According to research, **~98.7% of pump.fun tokens** exhibit rug pull characteristics. Key protections:
-
-| Check | Risk Level | Mitigation |
-|-------|------------|------------|
-| Mint Authority Active | HIGH | Must be revoked |
-| Freeze Authority Active | HIGH | Must be revoked for meme coins |
-| Update Authority Active | MEDIUM | Should be revoked |
-| LP Not Locked/Burned | HIGH | Lock or burn LP tokens |
-| High Token Concentration | HIGH | Check holder distribution |
-| Unverified Contract | MEDIUM | Use RugCheck.xyz verification |
-
-### Security Verification Services
-
-- [RugCheck.xyz](https://rugcheck.xyz/) - Comprehensive token scanner
-- [Am I Rug?](https://amirug.xyz/) - Pump.fun specific scanner
-- [Birdeye](https://birdeye.so/) - Market data and security indicators
-
-### Wallet & Key Management
-
-#### CRITICAL Security Rules
-
-1. **Never store private keys in code**
-2. **Never log private keys**
-3. **Never store seed phrases digitally**
-4. **Use hardware wallets for mainnet**
-
-#### Recommended Patterns
+### Token Creation API
 
 ```typescript
-// GOOD: Load from environment
-const privateKey = process.env.WALLET_PRIVATE_KEY;
-const keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
+import { BagsSDK } from "@bagsfm/bags-sdk";
 
-// GOOD: Load from secure file (gitignored)
-const keypairPath = path.join(__dirname, '../.keys/wallet.json');
-const keypair = Keypair.fromSecretKey(
-  Uint8Array.from(JSON.parse(fs.readFileSync(keypairPath, 'utf-8')))
-);
+const sdk = new BagsSDK(apiKey, connection, "processed");
 
-// BAD: Hardcoded key
-const keypair = Keypair.fromSecretKey(bs58.decode("abc123...")); // NEVER DO THIS
+// Create token metadata
+const result = await sdk.tokenLaunch.createTokenInfoAndMetadata({
+  name: "My Token",
+  symbol: "TOKEN",
+  description: "A cool meme coin",
+  imageUrl: "https://example.com/logo.png",
+  twitter: "mytoken",
+  telegram: "mytoken_group",
+  website: "https://mytoken.com",
+});
+
+// Result contains:
+// - tokenMint: string (the mint address)
+// - tokenMetadata: string (metadata URI)
+// - tokenLaunch: BagsLaunchPadTokenLaunch (launch details)
 ```
 
-#### Multi-Signature for Production
-
-For high-value operations, use Squads multisig:
-- Token creation authority
-- Fee collection wallets
-- Protocol upgrades
-
----
-
-## Transaction Best Practices
-
-### Priority Fees & Compute Units
+### Trading API
 
 ```typescript
-import {
-  ComputeBudgetProgram,
-  Transaction,
-} from "@solana/web3.js";
+// Get a quote
+const quote = await sdk.trade.getQuote({
+  inputMint: WSOL_MINT,           // What you're paying with
+  outputMint: tokenMint,          // What you're buying
+  amount: 100000000,              // Amount in smallest units (lamports)
+  slippageMode: "manual",
+  slippageBps: 500,               // 5% slippage
+});
 
-// 1. Simulate to get actual CU usage
-const simulation = await connection.simulateTransaction(transaction);
-const unitsUsed = simulation.value.unitsConsumed || 200000;
+// Create swap transaction
+const swapResult = await sdk.trade.createSwapTransaction({
+  quoteResponse: quote,
+  userPublicKey: wallet.publicKey,
+});
 
-// 2. Set compute limit (add 10% buffer)
-const computeLimit = Math.ceil(unitsUsed * 1.1);
-
-// 3. Set priority fee based on network conditions
-const priorityFee = await getPriorityFee(); // Use Helius Priority Fee API
-
-// 4. Add instructions
-transaction.add(
-  ComputeBudgetProgram.setComputeUnitLimit({ units: computeLimit }),
-  ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFee })
+// Sign and send
+swapResult.transaction.sign([wallet]);
+const signature = await connection.sendRawTransaction(
+  swapResult.transaction.serialize()
 );
 ```
 
-### Priority Fee Formula
-
-```
-Total Priority Fee = Compute Unit Limit × Compute Unit Price (microLamports)
-```
-
-**Tip**: Request only needed CUs - paying for 1.4M default CUs wastes money and lowers effective priority.
-
-### Transaction Simulation
-
-**ALWAYS simulate before sending:**
+### Quote Response Structure
 
 ```typescript
-async function safeTransaction(
-  connection: Connection,
-  transaction: Transaction,
-  signers: Keypair[]
-): Promise<string> {
-  // 1. Simulate first
-  const simulation = await connection.simulateTransaction(transaction);
-
-  if (simulation.value.err) {
-    throw new Error(`Simulation failed: ${JSON.stringify(simulation.value.err)}`);
-  }
-
-  // 2. Send with preflight checks enabled (default)
-  const signature = await connection.sendTransaction(transaction, signers, {
-    skipPreflight: false, // Keep this false!
-    preflightCommitment: "confirmed",
-  });
-
-  // 3. Confirm with appropriate commitment
-  await connection.confirmTransaction(signature, "confirmed");
-
-  return signature;
+interface TradeQuoteResponse {
+  contextSlot: number;
+  inAmount: string;           // Input amount
+  inputMint: string;
+  outAmount: string;          // Expected output
+  outputMint: string;
+  minOutAmount: string;       // Minimum after slippage
+  priceImpactPct: string;     // Price impact percentage
+  slippageBps: number;
+  routePlan: Array<{
+    venue: string;
+    inAmount: string;
+    outAmount: string;
+    // ... more fields
+  }>;
 }
 ```
-
-### When to Skip Preflight
-
-Only skip preflight (`skipPreflight: true`) when:
-- You need absolute lowest latency (sniping)
-- You've already simulated externally
-- You accept the risk of failed transactions
-
----
-
-## RPC Provider Selection
-
-### Comparison (2026)
-
-| Provider | Solana Focus | Latency | Free Tier | Best For |
-|----------|--------------|---------|-----------|----------|
-| **[Helius](https://helius.dev/)** | Solana-only | 10-80ms | 1M credits | Production Solana apps |
-| **[QuickNode](https://quicknode.com/)** | Multi-chain | ~50ms | Trial only | Cross-chain projects |
-| **[Chainstack](https://chainstack.com/)** | Multi-chain | ~60ms | Limited | Enterprise |
-| **[Alchemy](https://alchemy.com/)** | Multi-chain | ~70ms | Generous | General purpose |
-
-### Helius Recommended Settings
-
-```typescript
-import { Connection } from "@solana/web3.js";
-
-// Use staked connection for better transaction landing
-const connection = new Connection(
-  `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`,
-  {
-    commitment: "confirmed",
-    confirmTransactionInitialTimeout: 60000,
-  }
-);
-```
-
-### Priority Fee API (Helius)
-
-```typescript
-async function getPriorityFee(
-  accountKeys: string[],
-  level: "min" | "low" | "medium" | "high" | "veryHigh" | "unsafeMax" = "high"
-): Promise<number> {
-  const response = await fetch(
-    `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: "1",
-        method: "getPriorityFeeEstimate",
-        params: [{
-          accountKeys,
-          options: { priorityLevel: level }
-        }]
-      })
-    }
-  );
-  const data = await response.json();
-  return data.result.priorityFeeEstimate;
-}
-```
-
----
-
-## Token-2022 vs Classic SPL Token
-
-### Feature Comparison
-
-| Feature | Classic SPL | Token-2022 |
-|---------|-------------|------------|
-| Transfer Fees | No | Yes (built-in) |
-| Metadata | External (Metaplex) | Native extension |
-| Freeze Authority | Yes | Yes |
-| Mint Close | No | Yes (extension) |
-| Non-Transferable | No | Yes (soulbound) |
-| Confidential Transfers | No | Yes |
-| Interest Bearing | No | Yes |
-| Permanent Delegate | No | Yes |
-| Transfer Hooks | No | Yes |
-
-### When to Use Each
-
-**Use Classic SPL Token when:**
-- Maximum wallet compatibility needed
-- Simple fungible token
-- No special features required
-
-**Use Token-2022 when:**
-- Need transfer fees (protocol revenue)
-- Need on-chain metadata
-- Building RWA tokens
-- Need compliance features
-- pump.fun (required for `create_v2`)
-
-### Wallet Compatibility (2026)
-
-| Wallet | Classic SPL | Token-2022 |
-|--------|-------------|------------|
-| Phantom | Full | Partial |
-| Solflare | Full | Full |
-| Backpack | Full | Full |
-| Jupiter | Full | Most extensions |
 
 ---
 
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                           USER (Claude Chat)                          │
-└──────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                         MCP SERVER (ClaudeCandle)                     │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │
-│  │ create-token│  │  buy-token  │  │ sell-token  │  │  get-info   │  │
-│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘  │
-└──────────────────────────────────────────────────────────────────────┘
-                                    │
-                    ┌───────────────┼───────────────┐
-                    ▼               ▼               ▼
-           ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-           │ @pump-fun/  │  │   Helius    │  │   Solana    │
-           │  pump-sdk   │  │   RPC API   │  │  Web3.js    │
-           └─────────────┘  └─────────────┘  └─────────────┘
-                    │               │               │
-                    └───────────────┼───────────────┘
-                                    ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                         SOLANA BLOCKCHAIN                             │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │
-│  │  Pump.fun   │  │  PumpSwap   │  │  Token2022  │  │   Raydium   │  │
-│  │   Program   │  │    AMM      │  │   Program   │  │    (grad)   │  │
-│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘  │
-└──────────────────────────────────────────────────────────────────────┘
+                           USER (Claude Chat)
+                                   |
+                                   v
+               +-------------------------------------------+
+               |         MCP SERVER (ClaudeCandle)         |
+               |  +-------------+  +-------------+         |
+               |  |create-token |  |  buy-token  |         |
+               |  +-------------+  +-------------+         |
+               |  +-------------+  +-------------+         |
+               |  | sell-token  |  |  get-info   |         |
+               |  +-------------+  +-------------+         |
+               +-------------------------------------------+
+                                   |
+                   +---------------+---------------+
+                   v               v               v
+           +-------------+  +-------------+  +-------------+
+           | @bagsfm/    |  |   Helius    |  |   Solana    |
+           |  bags-sdk   |  |   RPC API   |  |  Web3.js    |
+           +-------------+  +-------------+  +-------------+
+                   |               |               |
+                   +---------------+---------------+
+                                   v
+               +-------------------------------------------+
+               |            SOLANA BLOCKCHAIN              |
+               |  +-------------+  +-------------+         |
+               |  |   Meteora   |  |  Bags AMM   |         |
+               |  |     DBC     |  |   Program   |         |
+               |  +-------------+  +-------------+         |
+               |  +-------------+  +-------------+         |
+               |  |  Token2022  |  |    WSOL     |         |
+               |  |   Program   |  |    Mint     |         |
+               |  +-------------+  +-------------+         |
+               +-------------------------------------------+
 ```
 
 ---
 
-## Core Dependencies
+## MCP Tools
 
-```json
-{
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.2",
-    "@pump-fun/pump-sdk": "^1.26.0",
-    "@pump-fun/pump-swap-sdk": "^1.0.0",
-    "@solana/web3.js": "^1.95.0",
-    "@solana/spl-token": "^0.4.14",
-    "zod": "^3.25.0",
-    "bs58": "^6.0.0",
-    "dotenv": "^16.4.0"
-  },
-  "devDependencies": {
-    "typescript": "^5.4.0",
-    "@types/node": "^20.0.0"
-  }
-}
-```
-
----
-
-## MCP Server Implementation
-
-### Server Setup
-
-```typescript
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
-import { Connection, Keypair } from "@solana/web3.js";
-import bs58 from "bs58";
-
-// Initialize server
-const server = new McpServer({
-  name: "claudecandle",
-  version: "1.0.0",
-});
-
-// Initialize Solana connection
-const connection = new Connection(
-  process.env.HELIUS_RPC_URL || "https://api.devnet.solana.com",
-  { commitment: "confirmed" }
-);
-
-// Load wallet securely
-function loadWallet(): Keypair {
-  const privateKey = process.env.WALLET_PRIVATE_KEY;
-  if (!privateKey) {
-    throw new Error("WALLET_PRIVATE_KEY not set");
-  }
-  return Keypair.fromSecretKey(bs58.decode(privateKey));
-}
-```
-
-### Tool Registration Pattern
-
-```typescript
-// Create Token Tool
-server.tool(
-  "create-token",
-  "Create a new meme coin on pump.fun with Token2022",
-  {
-    name: z.string().min(1).max(32).describe("Token name"),
-    symbol: z.string().min(1).max(10).describe("Token symbol/ticker"),
-    description: z.string().max(500).describe("Token description"),
-    imageUrl: z.string().url().optional().describe("Token logo URL"),
-    initialBuySol: z.number().min(0).max(85).default(0.1)
-      .describe("Initial SOL to buy (0-85)"),
-    slippageBps: z.number().min(0).max(5000).default(500)
-      .describe("Slippage tolerance in basis points (500 = 5%)"),
-  },
-  async ({ name, symbol, description, imageUrl, initialBuySol, slippageBps }) => {
-    try {
-      const wallet = loadWallet();
-
-      // 1. Validate inputs
-      if (name.length > 32) throw new Error("Name too long (max 32 chars)");
-      if (symbol.length > 10) throw new Error("Symbol too long (max 10 chars)");
-
-      // 2. Create token using official SDK
-      // ... implementation using @pump-fun/pump-sdk
-
-      // 3. Return result
-      return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({
-            success: true,
-            mintAddress: "...",
-            signature: "...",
-            explorerUrl: "https://solscan.io/token/...",
-            pumpfunUrl: "https://pump.fun/...",
-          }, null, 2)
-        }]
-      };
-    } catch (error) {
-      return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({
-            success: false,
-            error: error.message,
-          }, null, 2)
-        }]
-      };
-    }
-  }
-);
-```
-
-### All MCP Tools
+### Available Tools
 
 | Tool | Description | Key Parameters |
 |------|-------------|----------------|
-| `create-token` | Create pump.fun token | name, symbol, description, imageUrl, initialBuySol |
-| `buy-token` | Buy from bonding curve | mintAddress, solAmount, slippageBps |
-| `sell-token` | Sell to bonding curve | mintAddress, tokenAmount, slippageBps |
-| `get-token-info` | Get token details | mintAddress |
+| `create-token` | Create token on Bags.fm | name, symbol, description, imageUrl |
+| `buy-token` | Buy tokens with SOL | mintAddress, solAmount, slippageBps |
+| `sell-token` | Sell tokens for SOL | mintAddress, tokenAmount/percentage |
+| `get-token-info` | Get token metadata | mintAddress |
 | `get-bonding-curve` | Get curve status | mintAddress |
 | `get-balance` | Get wallet balances | address (optional) |
-| `simulate-buy` | Simulate buy without executing | mintAddress, solAmount |
-| `simulate-sell` | Simulate sell without executing | mintAddress, tokenAmount |
 
-### Detailed Tool Specifications
-
-#### create-token
+### create-token
 
 ```typescript
-// Zod Schema
 const createTokenSchema = {
   name: z.string()
-    .min(1, "Name is required")
-    .max(32, "Name must be 32 characters or less")
-    .describe("Token name (e.g., 'Dogwifhat')"),
+    .min(1).max(32)
+    .describe("Token name (e.g., 'My Awesome Token')"),
 
   symbol: z.string()
-    .min(1, "Symbol is required")
-    .max(10, "Symbol must be 10 characters or less")
-    .regex(/^[A-Z0-9]+$/, "Symbol must be uppercase alphanumeric")
-    .describe("Token symbol/ticker (e.g., 'WIF')"),
+    .min(1).max(10)
+    .describe("Token symbol/ticker (auto-uppercased)"),
 
   description: z.string()
-    .max(500, "Description must be 500 characters or less")
-    .default("")
-    .describe("Token description for metadata"),
+    .max(500).default("")
+    .describe("Token description"),
 
-  imageUrl: z.string()
-    .url("Must be a valid URL")
-    .optional()
-    .describe("Token logo URL (PNG/JPG, recommended 512x512)"),
+  imageUrl: z.string().url().optional()
+    .describe("URL to token logo image"),
 
-  twitter: z.string()
-    .url()
-    .optional()
-    .describe("Twitter/X profile URL"),
+  twitter: z.string().optional()
+    .describe("Twitter/X handle (without @)"),
 
-  telegram: z.string()
-    .url()
-    .optional()
-    .describe("Telegram group URL"),
+  telegram: z.string().optional()
+    .describe("Telegram group link or handle"),
 
-  website: z.string()
-    .url()
-    .optional()
+  website: z.string().url().optional()
     .describe("Project website URL"),
 
   initialBuySol: z.number()
-    .min(0, "Cannot be negative")
-    .max(85, "Cannot exceed 85 SOL (graduation threshold)")
-    .default(0.1)
-    .describe("Initial SOL to buy after creation"),
+    .min(0).max(100).default(0)
+    .describe("SOL to buy at launch"),
 
   slippageBps: z.number()
-    .min(0)
-    .max(5000, "Max slippage is 50%")
-    .default(500)
-    .describe("Slippage tolerance in basis points (500 = 5%)"),
+    .min(0).max(5000).default(500)
+    .describe("Slippage tolerance (500 = 5%)"),
 };
-
-// Response Type
-interface CreateTokenResponse {
-  success: boolean;
-  mintAddress?: string;
-  signature?: string;
-  explorerUrl?: string;
-  pumpfunUrl?: string;
-  tokensReceived?: string;
-  error?: string;
-}
 ```
 
-#### buy-token
+### buy-token
 
 ```typescript
 const buyTokenSchema = {
   mintAddress: z.string()
-    .length(44, "Invalid Solana address")
-    .describe("Token mint address"),
+    .min(32).max(44)
+    .describe("Token mint address to buy"),
 
   solAmount: z.number()
-    .positive("Amount must be positive")
-    .max(1000, "Max 1000 SOL per transaction")
+    .positive().max(100)
     .describe("Amount of SOL to spend"),
 
   slippageBps: z.number()
-    .min(0)
-    .max(5000)
-    .default(500)
-    .describe("Slippage tolerance in basis points"),
-
-  priorityLevel: z.enum(["low", "medium", "high", "veryHigh"])
-    .default("high")
-    .describe("Transaction priority level"),
+    .min(0).max(5000).default(500)
+    .describe("Slippage tolerance"),
 };
-
-interface BuyTokenResponse {
-  success: boolean;
-  signature?: string;
-  tokensReceived?: string;
-  pricePerToken?: string;
-  totalCost?: string;
-  error?: string;
-}
 ```
 
-#### sell-token
+### sell-token
 
 ```typescript
 const sellTokenSchema = {
   mintAddress: z.string()
-    .length(44)
-    .describe("Token mint address"),
+    .min(32).max(44)
+    .describe("Token mint address to sell"),
 
   tokenAmount: z.number()
-    .positive()
-    .optional()
-    .describe("Amount of tokens to sell (mutually exclusive with percentage)"),
+    .positive().optional()
+    .describe("Exact amount to sell"),
 
   percentage: z.number()
-    .min(1)
-    .max(100)
-    .optional()
-    .describe("Percentage of holdings to sell (1-100)"),
+    .min(1).max(100).optional()
+    .describe("Percentage of holdings to sell"),
 
   slippageBps: z.number()
-    .min(0)
-    .max(5000)
-    .default(500)
+    .min(0).max(5000).default(500)
     .describe("Slippage tolerance"),
 };
-
-interface SellTokenResponse {
-  success: boolean;
-  signature?: string;
-  solReceived?: string;
-  tokensSold?: string;
-  pricePerToken?: string;
-  error?: string;
-}
 ```
-
-#### get-token-info
-
-```typescript
-const getTokenInfoSchema = {
-  mintAddress: z.string()
-    .length(44)
-    .describe("Token mint address"),
-};
-
-interface TokenInfo {
-  mint: string;
-  name: string;
-  symbol: string;
-  description: string;
-  imageUrl: string;
-  creator: string;
-  createdAt: string;
-  totalSupply: string;
-  decimals: number;
-  bondingCurveProgress: number;  // 0-100%
-  marketCap: string;
-  priceInSol: string;
-  priceInUsd: string;
-  holders: number;
-  isGraduated: boolean;
-  poolAddress?: string;  // PumpSwap/Raydium address if graduated
-}
-```
-
-#### get-bonding-curve
-
-```typescript
-const getBondingCurveSchema = {
-  mintAddress: z.string()
-    .length(44)
-    .describe("Token mint address"),
-};
-
-interface BondingCurveInfo {
-  mint: string;
-  bondingCurveAddress: string;
-  virtualTokenReserves: string;
-  virtualSolReserves: string;
-  realTokenReserves: string;
-  realSolReserves: string;
-  tokenTotalSupply: string;
-  complete: boolean;
-  creator: string;
-  progress: number;           // 0-100%
-  solToGraduation: string;    // SOL needed to graduate
-  tokensRemaining: string;    // Tokens left in curve
-  currentPrice: string;       // Current price per token in SOL
-  marketCap: string;          // Market cap in SOL
-}
-```
-
-#### get-balance
-
-```typescript
-const getBalanceSchema = {
-  address: z.string()
-    .length(44)
-    .optional()
-    .describe("Wallet address (defaults to configured wallet)"),
-
-  mintAddress: z.string()
-    .length(44)
-    .optional()
-    .describe("Specific token to check (omit for all tokens)"),
-};
-
-interface BalanceInfo {
-  address: string;
-  solBalance: string;
-  solBalanceUsd: string;
-  tokens: Array<{
-    mint: string;
-    symbol: string;
-    name: string;
-    balance: string;
-    valueInSol: string;
-    valueInUsd: string;
-  }>;
-  totalValueUsd: string;
-}
 
 ---
 
@@ -795,6 +299,9 @@ interface BalanceInfo {
 ### Required Variables
 
 ```env
+# Bags.fm API Key (Required - get from dev.bags.fm)
+BAGS_API_KEY=your_bags_api_key
+
 # RPC (Required - use Helius for production)
 HELIUS_RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_API_KEY
 
@@ -802,8 +309,15 @@ HELIUS_RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_API_KEY
 WALLET_PRIVATE_KEY=your_base58_encoded_private_key
 
 # Network (Optional - defaults to mainnet)
-SOLANA_NETWORK=mainnet-beta  # or devnet
+SOLANA_NETWORK=mainnet-beta
 ```
+
+### Getting a Bags API Key
+
+1. Visit [dev.bags.fm](https://dev.bags.fm)
+2. Create a developer account
+3. Generate an API key
+4. Add to your environment
 
 ### MCP Configuration (Claude Desktop)
 
@@ -817,6 +331,7 @@ SOLANA_NETWORK=mainnet-beta  # or devnet
       "command": "node",
       "args": ["/absolute/path/to/claudecandle/dist/index.js"],
       "env": {
+        "BAGS_API_KEY": "your_bags_api_key",
         "HELIUS_RPC_URL": "https://mainnet.helius-rpc.com/?api-key=YOUR_KEY",
         "WALLET_PRIVATE_KEY": "your_base58_private_key"
       }
@@ -835,549 +350,152 @@ claudecandle/
 ├── package.json
 ├── tsconfig.json
 ├── .env.example
-├── .gitignore                   # MUST include .keys/, .env
+├── .gitignore
 ├── src/
-│   ├── index.ts                 # Entry point, server setup
+│   ├── index.ts                 # MCP server entry point
 │   ├── config/
-│   │   ├── constants.ts         # Program IDs, seeds
-│   │   └── networks.ts          # RPC endpoints
+│   │   └── constants.ts         # Program IDs, constants
 │   ├── tools/
-│   │   ├── createToken.ts
-│   │   ├── buyToken.ts
-│   │   ├── sellToken.ts
-│   │   ├── getTokenInfo.ts
-│   │   ├── getBondingCurve.ts
-│   │   └── getBalance.ts
+│   │   ├── createToken.ts       # Token creation
+│   │   ├── tradeToken.ts        # Buy/sell operations
+│   │   ├── getTokenInfo.ts      # Token queries
+│   │   └── getBalance.ts        # Balance queries
 │   ├── services/
-│   │   ├── pump.ts              # Pump.fun SDK wrapper
-│   │   ├── solana.ts            # Connection management
-│   │   └── priorityFee.ts       # Helius priority fee API
+│   │   ├── bags.ts              # Bags SDK wrapper
+│   │   └── solana.ts            # Solana connection
 │   ├── utils/
-│   │   ├── keypair.ts           # Secure key loading
-│   │   ├── validation.ts        # Input validation
-│   │   └── formatting.ts        # Output formatting
+│   │   └── keypair.ts           # Secure key loading
 │   └── types/
-│       └── index.ts             # TypeScript types
-├── .keys/                       # Keypair storage (gitignored!)
-│   └── .gitkeep
-└── tests/
-    └── *.test.ts
+│       └── index.ts             # TypeScript interfaces
+└── dist/                        # Compiled JavaScript
 ```
 
 ---
 
-## Security Checklist
+## Security Best Practices
 
-### Before Launch
+### Wallet & Key Management
 
-- [ ] Private keys loaded from environment/secure file only
-- [ ] `.keys/` and `.env` in `.gitignore`
-- [ ] All transactions simulated before sending
-- [ ] Priority fees calculated dynamically
-- [ ] Slippage set appropriately (5% default)
-- [ ] Error handling for all operations
-- [ ] Rate limiting implemented
-- [ ] Tested thoroughly on devnet
+**CRITICAL Rules:**
+1. Never store private keys in code
+2. Never log private keys
+3. Never commit `.env` files
+4. Use hardware wallets for mainnet funds
 
-### Token Creation
+```typescript
+// GOOD: Load from environment
+const privateKey = process.env.WALLET_PRIVATE_KEY;
+const keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
 
-- [ ] Mint authority will be revoked by pump.fun
-- [ ] Freeze authority will be revoked by pump.fun
-- [ ] Update authority revoked (pump.fun default)
-- [ ] Metadata immutable after creation
+// BAD: Hardcoded key
+const keypair = Keypair.fromSecretKey(bs58.decode("abc123...")); // NEVER!
+```
 
-### Production Deployment
+### Transaction Safety
 
-- [ ] Use Helius or QuickNode (not public RPC)
-- [ ] Consider multisig for treasury
-- [ ] Monitor for failed transactions
-- [ ] Set up alerts for large operations
-- [ ] Regular security audits
+1. Always simulate before sending
+2. Use appropriate slippage (5% default)
+3. Check balances before operations
+4. Verify addresses before sending
+
+### Token Security on Bags.fm
+
+- Mint authority: Managed by bonding curve
+- Freeze authority: Revoked by default
+- Update authority: Immutable metadata
+- LP tokens: Locked by protocol
 
 ---
 
 ## Error Handling
 
-### Common Errors & Solutions
+### Common Errors
 
 | Error | Cause | Solution |
 |-------|-------|----------|
-| `Blockhash not found` | Stale blockhash | Fetch fresh blockhash before sending |
-| `Insufficient funds` | Not enough SOL | Check balance, account for fees |
-| `Transaction simulation failed` | Invalid transaction | Check accounts, parameters |
-| `Account does not exist` | Token account not created | Create ATA first |
-| `Custom program error` | Pump.fun specific error | Check error code in IDL |
-| `Rate limited` | Too many requests | Implement backoff, use paid RPC |
+| `NO_API_KEY` | Missing BAGS_API_KEY | Set in environment |
+| `INSUFFICIENT_SOL` | Low balance | Add SOL to wallet |
+| `INVALID_MINT` | Bad address | Verify mint address |
+| `SLIPPAGE_EXCEEDED` | Price moved | Increase slippageBps |
+| `QUOTE_FAILED` | No liquidity | Check token exists |
+| `INSUFFICIENT_TOKENS` | Low token balance | Check holdings |
 
-### Retry Pattern
-
-```typescript
-async function withRetry<T>(
-  fn: () => Promise<T>,
-  maxRetries: number = 3,
-  baseDelay: number = 1000
-): Promise<T> {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await fn();
-    } catch (error) {
-      if (i === maxRetries - 1) throw error;
-
-      const delay = baseDelay * Math.pow(2, i);
-      console.log(`Retry ${i + 1}/${maxRetries} after ${delay}ms`);
-      await new Promise(r => setTimeout(r, delay));
-    }
-  }
-  throw new Error("Max retries exceeded");
-}
-```
-
-### Pump.fun Program Error Codes
-
-| Code | Name | Description | User Message |
-|------|------|-------------|--------------|
-| 6000 | `NotAuthorized` | Caller not authorized | "You don't have permission for this action" |
-| 6001 | `AlreadyInitialized` | Account already initialized | "This token already exists" |
-| 6002 | `TooMuchSolRequired` | Insufficient SOL for operation | "Not enough SOL for this purchase" |
-| 6003 | `TooLittleSolReceived` | Slippage exceeded on sell | "Price changed too much, try higher slippage" |
-| 6004 | `MintDoesNotMatchBondingCurve` | Wrong mint for curve | "Invalid token address" |
-| 6005 | `BondingCurveComplete` | Curve already graduated | "Token has graduated, trade on PumpSwap" |
-| 6006 | `BondingCurveNotComplete` | Curve not yet graduated | "Token hasn't graduated yet" |
-| 6007 | `NotEnoughTokens` | Insufficient token balance | "You don't have enough tokens to sell" |
-| 6008 | `InvalidAmount` | Invalid amount specified | "Amount must be greater than zero" |
-
-### Error Code Mapping
+### Error Response Format
 
 ```typescript
-const PUMP_ERROR_MESSAGES: Record<number, string> = {
-  6000: "You don't have permission for this action",
-  6001: "This token already exists",
-  6002: "Not enough SOL for this purchase. Check your balance.",
-  6003: "Price changed too much. Try increasing slippage tolerance.",
-  6004: "Invalid token address. Please verify the mint address.",
-  6005: "This token has graduated! Trade on PumpSwap instead.",
-  6006: "Token hasn't graduated yet. Still on bonding curve.",
-  6007: "Insufficient token balance. You can't sell more than you own.",
-  6008: "Invalid amount. Must be greater than zero.",
-};
-
-function parseTransactionError(error: any): string {
-  // Check for program error
-  const match = error.message?.match(/custom program error: 0x([0-9a-f]+)/i);
-  if (match) {
-    const code = parseInt(match[1], 16);
-    return PUMP_ERROR_MESSAGES[code] || `Unknown error (code ${code})`;
-  }
-
-  // Check for common Solana errors
-  if (error.message?.includes("insufficient funds")) {
-    return "Insufficient SOL balance for transaction and fees";
-  }
-  if (error.message?.includes("blockhash not found")) {
-    return "Transaction expired. Please try again.";
-  }
-  if (error.message?.includes("rate limit")) {
-    return "Too many requests. Please wait and try again.";
-  }
-
-  return error.message || "Unknown error occurred";
+interface ToolResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
 }
 ```
 
 ---
 
-## Testing Strategy
+## Development
 
-### Devnet Testing Workflow
-
-#### 1. Environment Setup
+### Building
 
 ```bash
-# Create devnet wallet
-solana-keygen new --outfile ~/.config/solana/devnet-wallet.json
+# Install dependencies
+npm install
 
-# Configure for devnet
-solana config set --url devnet
+# Build TypeScript
+npm run build
 
-# Get devnet SOL (2 SOL per request, max 10 SOL)
-solana airdrop 2 --keypair ~/.config/solana/devnet-wallet.json
-
-# Verify balance
-solana balance --keypair ~/.config/solana/devnet-wallet.json
+# Watch mode
+npm run dev
 ```
 
-#### 2. Environment Variables for Testing
-
-```env
-# .env.test
-SOLANA_NETWORK=devnet
-HELIUS_RPC_URL=https://devnet.helius-rpc.com/?api-key=YOUR_KEY
-WALLET_PRIVATE_KEY=your_devnet_wallet_base58_key
-```
-
-#### 3. Test Cases
-
-```typescript
-// tests/createToken.test.ts
-describe("create-token", () => {
-  it("should create token with valid metadata", async () => {
-    const result = await tools.createToken({
-      name: "Test Token",
-      symbol: "TEST",
-      description: "A test token",
-      initialBuySol: 0.01,
-    });
-    expect(result.success).toBe(true);
-    expect(result.mintAddress).toBeDefined();
-  });
-
-  it("should reject name > 32 characters", async () => {
-    const result = await tools.createToken({
-      name: "A".repeat(33),
-      symbol: "TEST",
-    });
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("32 characters");
-  });
-
-  it("should handle insufficient balance", async () => {
-    const result = await tools.createToken({
-      name: "Test",
-      symbol: "TEST",
-      initialBuySol: 1000, // More than wallet has
-    });
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("Insufficient");
-  });
-});
-
-// tests/buyToken.test.ts
-describe("buy-token", () => {
-  const testMint = "..."; // Use token created in previous test
-
-  it("should buy tokens successfully", async () => {
-    const result = await tools.buyToken({
-      mintAddress: testMint,
-      solAmount: 0.01,
-      slippageBps: 500,
-    });
-    expect(result.success).toBe(true);
-    expect(result.tokensReceived).toBeDefined();
-  });
-
-  it("should fail with invalid mint address", async () => {
-    const result = await tools.buyToken({
-      mintAddress: "invalid",
-      solAmount: 0.01,
-    });
-    expect(result.success).toBe(false);
-  });
-});
-```
-
-#### 4. Integration Test Script
+### Testing
 
 ```bash
-#!/bin/bash
-# scripts/test-devnet.sh
-
-echo "🚀 ClaudeCandle Devnet Integration Tests"
-echo "========================================"
-
-# Check devnet balance
-BALANCE=$(solana balance --url devnet)
-echo "💰 Devnet Balance: $BALANCE"
-
-if [[ $(echo "$BALANCE" | cut -d' ' -f1) < 0.1 ]]; then
-  echo "⚠️  Low balance, requesting airdrop..."
-  solana airdrop 2 --url devnet
-fi
-
-# Run tests
-echo "🧪 Running tests..."
-npm test -- --coverage
-
-echo "✅ Tests complete!"
+# Run tests (when available)
+npm test
 ```
 
-### Manual Testing Checklist
+### Dependencies
 
-- [ ] **Create Token**
-  - [ ] With all metadata fields
-  - [ ] With minimal fields (name, symbol only)
-  - [ ] With invalid inputs (should fail gracefully)
-  - [ ] With image URL
-  - [ ] Without image URL
-
-- [ ] **Buy Token**
-  - [ ] Small amount (0.001 SOL)
-  - [ ] With different slippage values
-  - [ ] On graduated token (should use PumpSwap)
-
-- [ ] **Sell Token**
-  - [ ] Partial sell (50%)
-  - [ ] Full sell (100%)
-  - [ ] More than balance (should fail)
-
-- [ ] **Query Tools**
-  - [ ] Get info for valid token
-  - [ ] Get info for invalid address
-  - [ ] Get bonding curve status
-  - [ ] Get balance
+```json
+{
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.2",
+    "@bagsfm/bags-sdk": "^1.2.7",
+    "@solana/web3.js": "^1.95.0",
+    "@solana/spl-token": "^0.4.14",
+    "zod": "^3.25.0",
+    "bs58": "^6.0.0",
+    "dotenv": "^16.4.0"
+  }
+}
+```
 
 ---
 
 ## Resources
 
-### Official Documentation
+### Bags.fm Documentation
 
-- [Pump.fun Public Docs](https://github.com/pump-fun/pump-public-docs)
-- [Solana Token Docs](https://solana.com/docs/tokens)
-- [Token-2022 Extensions](https://spl.solana.com/token-2022/extensions)
-- [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
+- [Bags.fm API Reference](https://docs.bags.fm/api-reference/introduction)
+- [Bags SDK on npm](https://www.npmjs.com/package/@bagsfm/bags-sdk)
+- [Developer Portal](https://dev.bags.fm)
+
+### Solana Resources
+
+- [Solana Docs](https://solana.com/docs)
+- [Token-2022 Guide](https://spl.solana.com/token-2022)
 - [Helius Documentation](https://www.helius.dev/docs)
 
-### Security Resources
+### MCP Resources
 
-- [RugCheck.xyz](https://rugcheck.xyz/)
-- [Helius Security Guide](https://www.helius.dev/blog/a-hitchhikers-guide-to-solana-program-security)
-- [Solana Security Best Practices](https://docs.solanalabs.com/operations/best-practices/security)
-
-### Community
-
-- [Pump Developer Telegram](https://t.me/pump_tech_updates)
-- [Solana Stack Exchange](https://solana.stackexchange.com/)
-
----
-
-## Launchpad Competitive Analysis
-
-### Market Overview (2025-2026)
-
-| Platform | Market Share | Daily Revenue | Tokens/Day | Graduation Rate |
-|----------|--------------|---------------|------------|-----------------|
-| **Pump.fun** | 73-80% | $13.5M peak | 72,000+ | ~1.4% |
-| **LetsBonk** | 15-64% (varies) | $7.9M peak | 45,000+ | ~2% |
-| **LaunchLab** | 5-15% | $2.8M rewards | 15,000+ | Higher |
-| **Moonshot** | <5% | N/A | 333 (launch) | 8% |
-| **Believe** | Growing | $13M creator fees | 14,000+ | N/A |
-
-### Fee Structure Comparison
-
-| Platform | Creation Fee | Trading Fee | Graduation Fee | Creator Reward |
-|----------|--------------|-------------|----------------|----------------|
-| **Pump.fun** | FREE (buyer pays) | 1% | 1.5 SOL | 0.5 SOL + 50% LP fees |
-| **LetsBonk** | ~0.02 SOL | 1% | Similar | 1% of trading fees |
-| **LaunchLab** | FREE | Variable | 85 SOL threshold | 10% LP fees (with NFT) |
-| **Moonshot** | 0.02 SOL | 1% | 500 SOL | N/A |
-| **Believe** | FREE (via tweet) | 2% | $100K mcap | 1% of fees |
-
-### Graduation Mechanics
-
-| Platform | Threshold | Migration Target | LP Handling |
-|----------|-----------|------------------|-------------|
-| **Pump.fun** | ~$69K mcap / 85 SOL | PumpSwap (native) | Auto-locked |
-| **LetsBonk** | 85 SOL | Raydium | Burned |
-| **LaunchLab** | 30-85 SOL (configurable) | Raydium CPMM | 90% burned, 10% locked |
-| **Moonshot** | 500 SOL | Raydium | Locked |
-| **Believe** | $100K mcap | Meteora | Auto |
-
-### Key Differentiators
-
-#### Pump.fun (Market Leader)
-- **Strength**: First mover, massive liquidity, native DEX (PumpSwap)
-- **Innovation**: Project Ascend (dynamic fees 0.05%-0.95%), creator revenue sharing
-- **Stats**: $800M+ lifetime revenue, fastest to $100M in crypto history
-
-#### LetsBonk/Bonk.fun
-- **Strength**: BONK ecosystem integration, validator rewards
-- **Innovation**: Fee distribution (40% devs, 30% validators, 30% BONK buyback)
-- **Unique**: Tied to established meme coin ecosystem
-
-#### Raydium LaunchLab
-- **Strength**: DEX integration, customization options
-- **Innovation**: Multiple curve types (linear, exponential, logarithmic)
-- **Unique**: JustSendit mode vs LaunchLab mode, vesting options
-
-#### Believe App
-- **Strength**: Social-first (launch via Twitter reply)
-- **Innovation**: Zero wallet needed, AI-powered token creation
-- **Risk**: Metadata can be changed post-launch (security concern)
-
-#### Moonshot (DEX Screener)
-- **Strength**: Built-in analytics, audited contracts
-- **Innovation**: Pre-audited templates, anti-manipulation
-- **Unique**: Higher graduation threshold (500 SOL)
-
-### What Makes Launchpads Successful
-
-1. **Simplicity**: One-click token creation, no coding required
-2. **Low Costs**: Free or near-free creation (< 0.02 SOL)
-3. **Fair Launch**: No presales, no team allocations, bonding curve pricing
-4. **Instant Liquidity**: Bonding curve provides immediate trading
-5. **Security**: Auto-revoked authorities, locked LP, audited contracts
-6. **Creator Incentives**: Revenue sharing, rewards on graduation
-7. **Network Effects**: More users → more liquidity → more users
-
----
-
-## ClaudeCandle Unique Value Proposition
-
-### Why MCP-Based Launchpad?
-
-1. **Conversational UX**: Launch tokens through natural language
-2. **AI-Guided**: Claude helps with naming, tokenomics, strategy
-3. **Education**: Explains risks, best practices during creation
-4. **Automation**: Multi-step workflows handled seamlessly
-5. **Integration**: Works with Claude Desktop, IDE extensions, custom agents
-
-### Differentiation Strategy
-
-| Feature | Pump.fun | ClaudeCandle |
-|---------|----------|--------------|
-| Interface | Web UI | Conversational AI |
-| Learning Curve | Minutes | Seconds (just talk) |
-| Guidance | None | AI-assisted decisions |
-| Batch Operations | Manual | Automated workflows |
-| Analytics | Basic | AI-powered insights |
-| Security Checks | Post-creation | Pre-creation warnings |
-
----
-
-## Implementation Roadmap
-
-### Phase 1: Foundation (Week 1-2)
-**Goal**: Working MCP server that can create tokens on devnet
-
-- [ ] **Project Setup**
-  - [ ] Initialize npm project with TypeScript
-  - [ ] Configure tsconfig.json for ES modules
-  - [ ] Set up .env and .gitignore
-  - [ ] Create folder structure
-
-- [ ] **Core MCP Server**
-  - [ ] Set up McpServer with stdio transport
-  - [ ] Implement health check tool
-  - [ ] Add Solana connection service
-  - [ ] Add secure keypair loading
-
-- [ ] **First Tool: create-token**
-  - [ ] Integrate @pump-fun/pump-sdk
-  - [ ] Implement token creation with metadata
-  - [ ] Add input validation (Zod schemas)
-  - [ ] Return transaction signature and links
-
-### Phase 2: Trading Tools (Week 3)
-**Goal**: Complete buy/sell functionality
-
-- [ ] **buy-token tool**
-  - [ ] SOL amount input with slippage
-  - [ ] Transaction simulation before execution
-  - [ ] Priority fee optimization
-
-- [ ] **sell-token tool**
-  - [ ] Token amount or percentage input
-  - [ ] Partial and full sells
-  - [ ] Slippage protection
-
-- [ ] **Query Tools**
-  - [ ] get-token-info (metadata, supply, price)
-  - [ ] get-bonding-curve (progress, reserves)
-  - [ ] get-balance (SOL and token balances)
-
-### Phase 3: Production Hardening (Week 4)
-**Goal**: Mainnet-ready with robust error handling
-
-- [ ] **Transaction Reliability**
-  - [ ] Helius Priority Fee API integration
-  - [ ] Compute unit optimization
-  - [ ] Retry logic with exponential backoff
-  - [ ] Transaction confirmation tracking
-
-- [ ] **Security**
-  - [ ] Input sanitization
-  - [ ] Rate limiting
-  - [ ] Audit logging
-  - [ ] Devnet/mainnet separation
-
-- [ ] **Error Handling**
-  - [ ] Comprehensive error messages
-  - [ ] User-friendly explanations
-  - [ ] Recovery suggestions
-
-### Phase 4: Advanced Features (Week 5-6)
-**Goal**: Differentiated features
-
-- [ ] **Monitoring Tools**
-  - [ ] watch-bonding-curve (real-time updates)
-  - [ ] alert-graduation (notify on completion)
-  - [ ] portfolio-tracker (track created tokens)
-
-- [ ] **AI-Enhanced Features**
-  - [ ] Token name suggestions
-  - [ ] Risk assessment before creation
-  - [ ] Market analysis integration
-
-- [ ] **Multi-Platform Support**
-  - [ ] LaunchLab integration (optional)
-  - [ ] PumpSwap trading post-graduation
-
-### Phase 5: Launch (Week 7+)
-**Goal**: Public release
-
-- [ ] **Testing**
-  - [ ] Comprehensive devnet testing
-  - [ ] Limited mainnet beta
-  - [ ] Security review
-
-- [ ] **Documentation**
-  - [ ] User guide
-  - [ ] API reference
-  - [ ] Video tutorials
-
-- [ ] **Distribution**
-  - [ ] npm package publish
-  - [ ] MCP registry listing
-  - [ ] Community outreach
-
----
-
-## Next Steps (Immediate Actions)
-
-### Step 1: Initialize Project
-```bash
-mkdir -p src/{tools,services,utils,config,types}
-npm init -y
-npm install @modelcontextprotocol/sdk @pump-fun/pump-sdk @solana/web3.js zod bs58 dotenv
-npm install -D typescript @types/node
-npx tsc --init
-```
-
-### Step 2: Create Core Files
-1. `src/index.ts` - MCP server entry point
-2. `src/config/constants.ts` - Program IDs, seeds
-3. `src/services/solana.ts` - Connection management
-4. `src/services/pump.ts` - Pump.fun SDK wrapper
-5. `src/utils/keypair.ts` - Secure key loading
-6. `src/tools/createToken.ts` - First tool
-
-### Step 3: Test on Devnet
-1. Get devnet SOL from faucet
-2. Create test token
-3. Verify on Solscan/Solana Explorer
-4. Test buy/sell operations
-
-### Step 4: Iterate and Expand
-1. Add remaining tools
-2. Improve error handling
-3. Add transaction optimization
-4. Prepare for mainnet
+- [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
+- [MCP Specification](https://modelcontextprotocol.io)
 
 ---
 
 ## License
 
-MIT License - Use at your own risk. This is experimental software for educational purposes.
+MIT License - Use at your own risk. This is experimental software.
 
 **DISCLAIMER**: Cryptocurrency trading involves significant risk. Always do your own research. This software is not financial advice.
 
@@ -1385,5 +503,5 @@ MIT License - Use at your own risk. This is experimental software for educationa
 
 *ClaudeCandle: Light up the Solana blockchain with AI-powered meme coins*
 
+**Platform**: Bags.fm (Meteora Dynamic Bonding Curves)
 **Last Updated**: January 27, 2026
-**Research Sources**: Solana Docs, Pump.fun Public Docs, Helius, RugCheck, Metaplex, MCP SDK

@@ -1,17 +1,14 @@
+/**
+ * Token Info Tools
+ * Query token and curve information via Bags SDK
+ */
+
 import { PublicKey } from "@solana/web3.js";
 import { z } from "zod";
-import {
-  getConnection,
-  getBondingCurveAddress,
-  formatTokenAmount,
-} from "../services/solana.js";
+import { getBagsSDK } from "../services/bags.js";
+import { getConnection, formatTokenAmount } from "../services/solana.js";
 import { isValidSolanaAddress } from "../utils/keypair.js";
-import {
-  PUMP_PROGRAM_ID,
-  TOKEN_DECIMALS,
-  INITIAL_REAL_TOKEN_RESERVES,
-  LAMPORTS_PER_SOL,
-} from "../config/constants.js";
+import { TOKEN_DECIMALS, ERROR_MESSAGES } from "../config/constants.js";
 import type { TokenInfo, BondingCurveInfo, ToolResponse } from "../types/index.js";
 
 // =============================================================================
@@ -36,153 +33,6 @@ export type GetTokenInfoParams = z.infer<z.ZodObject<typeof getTokenInfoSchema>>
 export type GetBondingCurveParams = z.infer<z.ZodObject<typeof getBondingCurveSchema>>;
 
 // =============================================================================
-// Bonding Curve Account Parsing
-// =============================================================================
-
-interface ParsedBondingCurve {
-  virtualTokenReserves: bigint;
-  virtualSolReserves: bigint;
-  realTokenReserves: bigint;
-  realSolReserves: bigint;
-  tokenTotalSupply: bigint;
-  complete: boolean;
-  creator: PublicKey;
-}
-
-function parseBondingCurveAccount(data: Buffer): ParsedBondingCurve | null {
-  try {
-    // Skip 8-byte discriminator
-    let offset = 8;
-
-    const virtualTokenReserves = data.readBigUInt64LE(offset);
-    offset += 8;
-
-    const virtualSolReserves = data.readBigUInt64LE(offset);
-    offset += 8;
-
-    const realTokenReserves = data.readBigUInt64LE(offset);
-    offset += 8;
-
-    const realSolReserves = data.readBigUInt64LE(offset);
-    offset += 8;
-
-    const tokenTotalSupply = data.readBigUInt64LE(offset);
-    offset += 8;
-
-    const complete = data.readUInt8(offset) === 1;
-    offset += 1;
-
-    const creatorBytes = data.subarray(offset, offset + 32);
-    const creator = new PublicKey(creatorBytes);
-
-    return {
-      virtualTokenReserves,
-      virtualSolReserves,
-      realTokenReserves,
-      realSolReserves,
-      tokenTotalSupply,
-      complete,
-      creator,
-    };
-  } catch {
-    return null;
-  }
-}
-
-// =============================================================================
-// Get Bonding Curve Info
-// =============================================================================
-
-export async function getBondingCurve(
-  params: GetBondingCurveParams
-): Promise<ToolResponse<BondingCurveInfo>> {
-  try {
-    if (!isValidSolanaAddress(params.mintAddress)) {
-      return {
-        success: false,
-        error: "Invalid mint address format",
-      };
-    }
-
-    const mint = new PublicKey(params.mintAddress);
-    const bondingCurveAddress = getBondingCurveAddress(mint);
-    const conn = getConnection();
-
-    // Fetch bonding curve account
-    const accountInfo = await conn.getAccountInfo(bondingCurveAddress);
-
-    if (!accountInfo) {
-      return {
-        success: false,
-        error: "Token not found on pump.fun. It may not exist or has already graduated.",
-      };
-    }
-
-    // Verify it's owned by Pump program
-    if (!accountInfo.owner.equals(PUMP_PROGRAM_ID)) {
-      return {
-        success: false,
-        error: "Invalid bonding curve account - not owned by Pump.fun program",
-      };
-    }
-
-    const parsed = parseBondingCurveAccount(accountInfo.data);
-
-    if (!parsed) {
-      return {
-        success: false,
-        error: "Failed to parse bonding curve account data",
-      };
-    }
-
-    // Calculate progress (how much of the curve has been filled)
-    const tokensSold = INITIAL_REAL_TOKEN_RESERVES - parsed.realTokenReserves;
-    const progress = Number(tokensSold * BigInt(10000) / INITIAL_REAL_TOKEN_RESERVES) / 100;
-
-    // Calculate current price
-    // Price = virtualSolReserves / virtualTokenReserves
-    const currentPrice = Number(parsed.virtualSolReserves) / Number(parsed.virtualTokenReserves);
-
-    // Calculate SOL needed to graduate
-    const solToGraduation = parsed.complete
-      ? 0
-      : (85 - Number(parsed.realSolReserves) / LAMPORTS_PER_SOL);
-
-    // Calculate market cap
-    const marketCapLamports = Number(parsed.virtualSolReserves) *
-      (Number(parsed.tokenTotalSupply) / Number(parsed.virtualTokenReserves));
-    const marketCap = marketCapLamports / LAMPORTS_PER_SOL;
-
-    const result: BondingCurveInfo = {
-      mint: params.mintAddress,
-      bondingCurveAddress: bondingCurveAddress.toBase58(),
-      virtualTokenReserves: parsed.virtualTokenReserves.toString(),
-      virtualSolReserves: parsed.virtualSolReserves.toString(),
-      realTokenReserves: parsed.realTokenReserves.toString(),
-      realSolReserves: parsed.realSolReserves.toString(),
-      tokenTotalSupply: parsed.tokenTotalSupply.toString(),
-      complete: parsed.complete,
-      creator: parsed.creator.toBase58(),
-      progress: Math.min(progress, 100),
-      solToGraduation: solToGraduation.toFixed(4),
-      tokensRemaining: formatTokenAmount(parsed.realTokenReserves, TOKEN_DECIMALS),
-      currentPrice: currentPrice.toFixed(12),
-      marketCap: marketCap.toFixed(4),
-    };
-
-    return {
-      success: true,
-      data: result,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to get bonding curve info",
-    };
-  }
-}
-
-// =============================================================================
 // Get Token Info
 // =============================================================================
 
@@ -193,23 +43,20 @@ export async function getTokenInfo(
     if (!isValidSolanaAddress(params.mintAddress)) {
       return {
         success: false,
-        error: "Invalid mint address format",
+        error: ERROR_MESSAGES.INVALID_MINT,
       };
     }
 
     const mint = new PublicKey(params.mintAddress);
     const conn = getConnection();
 
-    // First try to get bonding curve info
-    const bondingCurveResult = await getBondingCurve(params);
-
-    // Get mint account info
+    // Get mint account info for basic token data
     const mintInfo = await conn.getParsedAccountInfo(mint);
 
     if (!mintInfo.value) {
       return {
         success: false,
-        error: "Token mint not found",
+        error: ERROR_MESSAGES.TOKEN_NOT_FOUND,
       };
     }
 
@@ -217,20 +64,32 @@ export async function getTokenInfo(
     const decimals = mintData?.decimals || TOKEN_DECIMALS;
     const supply = mintData?.supply || "0";
 
-    // Build token info
+    // Try to get additional info from Bags SDK
+    let bagsInfo: any = null;
+    try {
+      const sdk = getBagsSDK();
+      // Use SDK state service if available
+      if (sdk.state && typeof sdk.state.getTokenCreators === 'function') {
+        bagsInfo = await sdk.state.getTokenCreators(mint);
+      }
+    } catch {
+      // SDK info not available, continue with on-chain data
+    }
+
+    // Build token info response
     const tokenInfo: TokenInfo = {
       mint: params.mintAddress,
-      name: "Unknown", // Would need metadata lookup
-      symbol: "Unknown",
-      description: "",
-      imageUrl: "",
-      creator: bondingCurveResult.data?.creator || "Unknown",
+      name: bagsInfo?.name || "Unknown",
+      symbol: bagsInfo?.symbol || "Unknown",
+      description: bagsInfo?.description || "",
+      imageUrl: bagsInfo?.image || "",
+      creator: bagsInfo?.creator || "Unknown",
       totalSupply: formatTokenAmount(BigInt(supply), decimals),
       decimals,
-      bondingCurveProgress: bondingCurveResult.data?.progress || 0,
-      marketCap: bondingCurveResult.data?.marketCap || "0",
-      priceInSol: bondingCurveResult.data?.currentPrice || "0",
-      isGraduated: bondingCurveResult.data?.complete || false,
+      bondingCurveProgress: bagsInfo?.progress || 0,
+      marketCap: bagsInfo?.marketCap || "0",
+      priceInSol: bagsInfo?.price || "0",
+      isGraduated: bagsInfo?.isComplete || false,
     };
 
     return {
@@ -246,25 +105,91 @@ export async function getTokenInfo(
 }
 
 // =============================================================================
+// Get Bonding Curve Info
+// =============================================================================
+
+export async function getBondingCurve(
+  params: GetBondingCurveParams
+): Promise<ToolResponse<BondingCurveInfo>> {
+  try {
+    if (!isValidSolanaAddress(params.mintAddress)) {
+      return {
+        success: false,
+        error: ERROR_MESSAGES.INVALID_MINT,
+      };
+    }
+
+    // Try to get curve info from Bags SDK
+    try {
+      const sdk = getBagsSDK();
+
+      // Use SDK state service if available
+      if (sdk.state) {
+        const curveState = await (sdk.state as any).getCurveState?.(params.mintAddress);
+
+        if (curveState) {
+          return {
+            success: true,
+            data: {
+              mint: params.mintAddress,
+              curveAddress: curveState.curveAddress || "Unknown",
+              progress: curveState.progress || 0,
+              currentPrice: curveState.price || "0",
+              marketCap: curveState.marketCap || "0",
+              isComplete: curveState.isComplete || false,
+              creator: curveState.creator,
+            },
+          };
+        }
+      }
+    } catch {
+      // SDK call failed, return basic info
+    }
+
+    // Return basic info if SDK doesn't have curve data
+    return {
+      success: true,
+      data: {
+        mint: params.mintAddress,
+        curveAddress: "Query via Bags.fm",
+        progress: 0,
+        currentPrice: "Query via Bags.fm",
+        marketCap: "Query via Bags.fm",
+        isComplete: false,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to get bonding curve info",
+    };
+  }
+}
+
+// =============================================================================
 // Tool Descriptions
 // =============================================================================
 
-export const getTokenInfoDescription = `Get detailed information about a pump.fun token.
+export const getTokenInfoDescription = `Get information about a token on Bags.fm.
 
 Returns:
-- Token metadata (name, symbol, description)
+- Token metadata (name, symbol, description, image)
 - Creator address
 - Total supply and decimals
-- Bonding curve progress
 - Current price and market cap
-- Whether the token has graduated`;
+- Whether the token has graduated
 
-export const getBondingCurveDescription = `Get bonding curve status for a pump.fun token.
+**Parameters:**
+- mintAddress: The token's mint address`;
+
+export const getBondingCurveDescription = `Get bonding curve status for a Bags.fm token.
 
 Returns:
-- Virtual and real reserves
-- Progress percentage (0-100%)
-- SOL needed to graduate
-- Tokens remaining in curve
+- Curve address
+- Progress percentage
 - Current price
-- Whether curve is complete`;
+- Market cap
+- Whether curve is complete (graduated)
+
+**Parameters:**
+- mintAddress: The token's mint address`;

@@ -1,3 +1,8 @@
+/**
+ * Solana Service
+ * Generic Solana helpers for connection, balances, and transactions
+ */
+
 import {
   Connection,
   PublicKey,
@@ -10,10 +15,8 @@ import { getAssociatedTokenAddress, getAccount, TokenAccountNotFoundError } from
 import {
   RPC_ENDPOINTS,
   LAMPORTS_PER_SOL,
-  PUMP_PROGRAM_ID,
-  PDA_SEEDS,
   TOKEN_2022_PROGRAM_ID,
-  PUMP_ERROR_MESSAGES,
+  ERROR_MESSAGES,
 } from "../config/constants.js";
 import type { NetworkName, PriorityLevel, PriorityFeeEstimate } from "../types/index.js";
 
@@ -36,7 +39,7 @@ export function getConnection(): Connection {
                  RPC_ENDPOINTS[getNetwork()];
 
   connection = new Connection(rpcUrl, {
-    commitment: "confirmed",
+    commitment: "processed",
     confirmTransactionInitialTimeout: 60000,
   });
 
@@ -47,11 +50,11 @@ export function getConnection(): Connection {
  * Get the current network from environment
  */
 export function getNetwork(): NetworkName {
-  const network = process.env.SOLANA_NETWORK || "devnet";
+  const network = process.env.SOLANA_NETWORK || "mainnet-beta";
   if (network in RPC_ENDPOINTS) {
     return network as NetworkName;
   }
-  return "devnet";
+  return "mainnet-beta";
 }
 
 /**
@@ -106,43 +109,6 @@ export async function getTokenBalance(
 }
 
 // =============================================================================
-// PDA Derivation
-// =============================================================================
-
-/**
- * Derive bonding curve PDA for a token
- */
-export function getBondingCurveAddress(mint: PublicKey): PublicKey {
-  const [bondingCurve] = PublicKey.findProgramAddressSync(
-    [Buffer.from(PDA_SEEDS.BONDING_CURVE), mint.toBuffer()],
-    PUMP_PROGRAM_ID
-  );
-  return bondingCurve;
-}
-
-/**
- * Derive global account PDA
- */
-export function getGlobalAccountAddress(): PublicKey {
-  const [global] = PublicKey.findProgramAddressSync(
-    [Buffer.from(PDA_SEEDS.GLOBAL)],
-    PUMP_PROGRAM_ID
-  );
-  return global;
-}
-
-/**
- * Derive mint authority PDA
- */
-export function getMintAuthorityAddress(): PublicKey {
-  const [mintAuthority] = PublicKey.findProgramAddressSync(
-    [Buffer.from(PDA_SEEDS.MINT_AUTHORITY)],
-    PUMP_PROGRAM_ID
-  );
-  return mintAuthority;
-}
-
-// =============================================================================
 // Priority Fees
 // =============================================================================
 
@@ -186,13 +152,13 @@ export async function getPriorityFeeEstimate(
     const data = await response.json() as { result?: PriorityFeeEstimate; error?: any };
 
     if (data.error) {
-      console.warn("Priority fee API error:", data.error);
+      console.error("Priority fee API error:", data.error);
       return 500000; // Default fallback
     }
 
     return data.result?.priorityFeeEstimate || 500000;
   } catch (error) {
-    console.warn("Failed to get priority fee estimate:", error);
+    console.error("Failed to get priority fee estimate:", error);
     return 500000; // Default fallback
   }
 }
@@ -324,19 +290,9 @@ export async function sendAndConfirmTransaction(
 export function parseTransactionError(error: any): string {
   const errorStr = typeof error === "string" ? error : JSON.stringify(error);
 
-  // Check for Pump.fun program error codes
-  const programErrorMatch = errorStr.match(/custom program error: 0x([0-9a-fA-F]+)/i);
-  if (programErrorMatch) {
-    const code = parseInt(programErrorMatch[1], 16);
-    if (code in PUMP_ERROR_MESSAGES) {
-      return PUMP_ERROR_MESSAGES[code];
-    }
-    return `Program error (code ${code})`;
-  }
-
   // Check for common Solana errors
   if (errorStr.includes("insufficient funds") || errorStr.includes("InsufficientFunds")) {
-    return "Insufficient SOL balance for transaction and fees";
+    return ERROR_MESSAGES.INSUFFICIENT_SOL;
   }
   if (errorStr.includes("blockhash not found") || errorStr.includes("BlockhashNotFound")) {
     return "Transaction expired. Please try again.";
@@ -349,6 +305,9 @@ export function parseTransactionError(error: any): string {
   }
   if (errorStr.includes("simulation failed")) {
     return "Transaction simulation failed. Check parameters and try again.";
+  }
+  if (errorStr.includes("slippage")) {
+    return ERROR_MESSAGES.SLIPPAGE_EXCEEDED;
   }
 
   return errorStr;
@@ -416,11 +375,4 @@ export function getExplorerUrl(
     return `https://solscan.io/tx/${signatureOrAddress}${cluster}`;
   }
   return `https://solscan.io/account/${signatureOrAddress}${cluster}`;
-}
-
-/**
- * Get pump.fun URL for a token
- */
-export function getPumpFunUrl(mintAddress: string): string {
-  return `https://pump.fun/${mintAddress}`;
 }
