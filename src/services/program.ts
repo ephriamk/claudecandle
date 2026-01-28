@@ -4,7 +4,10 @@
  * Seeds verified from IDL byte arrays (all lowercase).
  */
 
-import { Program, AnchorProvider, Wallet, Idl } from "@coral-xyz/anchor";
+import anchor from "@coral-xyz/anchor";
+import type { Idl } from "@coral-xyz/anchor";
+const { Program, AnchorProvider, Wallet } = anchor;
+type Program = InstanceType<typeof Program>;
 import { Connection, PublicKey, Keypair } from "@solana/web3.js";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";

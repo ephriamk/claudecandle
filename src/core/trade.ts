@@ -5,7 +5,9 @@
  */
 
 import { PublicKey } from "@solana/web3.js";
-import { BN } from "@coral-xyz/anchor";
+import anchor from "@coral-xyz/anchor";
+const { BN } = anchor;
+type BN = InstanceType<typeof BN>;
 import { getProgram, getConfigPda, getBondingCurvePda } from "../services/program.js";
 import { getConnection, getSolBalance, getTokenBalance, solToLamports, lamportsToSol, getExplorerUrl } from "../services/solana.js";
 import { loadKeypair } from "../utils/keypair.js";
