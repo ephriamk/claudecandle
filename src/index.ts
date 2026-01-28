@@ -1,68 +1,36 @@
 #!/usr/bin/env node
 
 /**
- * ClaudeCandle - MCP Server for Bags.fm
+ * ClaudeCandle - MCP Server for auto.fun
  *
- * An MCP server that enables Claude to create and trade tokens on Bags.fm
- * through natural language conversations.
+ * An MCP server that enables Claude to create and trade tokens on auto.fun's
+ * bonding curve contracts through natural language conversations.
  *
  * Tools:
- * - create-token: Launch new tokens on Bags.fm
- * - buy-token: Buy tokens via Bags.fm trading
- * - sell-token: Sell tokens via Bags.fm trading
+ * - create-token: Launch new tokens on auto.fun
+ * - buy-token: Buy tokens with SOL
+ * - sell-token: Sell tokens for SOL
  * - get-balance: Check wallet balances
- * - get-token-info: Get token metadata
- * - get-bonding-curve: Check curve status
+ * - get-token-info: Get bonding curve status and price
  * - server-status: Health check
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
 import dotenv from "dotenv";
 
 // Load environment variables
 dotenv.config();
 
-// Import tools
-import {
-  getBalance,
-  getBalanceSchema,
-  getBalanceDescription,
-} from "./tools/getBalance.js";
-
-import {
-  getTokenInfo,
-  getTokenInfoSchema,
-  getTokenInfoDescription,
-  getBondingCurve,
-  getBondingCurveSchema,
-  getBondingCurveDescription,
-} from "./tools/getTokenInfo.js";
-
-import {
-  createToken,
-  createTokenSchema,
-  createTokenDescription,
-} from "./tools/createToken.js";
-
-import {
-  buyToken,
-  buyTokenSchema,
-  buyTokenDescription,
-  sellToken,
-  sellTokenSchema,
-  sellTokenDescription,
-} from "./tools/tradeToken.js";
+// Import core logic
+import { launchToken } from "./core/launch.js";
+import { buyToken, sellToken } from "./core/trade.js";
+import { getCurveInfo } from "./core/info.js";
+import { getBalance } from "./core/balance.js";
 
 // Import services
-import {
-  getConnection,
-  getNetwork,
-  isMainnet,
-  getExplorerUrl,
-  getSolBalance,
-} from "./services/solana.js";
-import { getBagsFmUrl, isSDKConfigured } from "./services/bags.js";
+import { getConnection, getNetwork, isMainnet, getSolBalance } from "./services/solana.js";
 import { loadKeypair, getPublicKeyString } from "./utils/keypair.js";
 
 // =============================================================================
@@ -71,7 +39,7 @@ import { loadKeypair, getPublicKeyString } from "./utils/keypair.js";
 
 const server = new McpServer({
   name: "claudecandle",
-  version: "1.0.0",
+  version: "2.0.0",
 });
 
 // =============================================================================
@@ -80,10 +48,21 @@ const server = new McpServer({
 
 server.tool(
   "create-token",
-  createTokenDescription,
-  createTokenSchema,
+  "Create a new meme coin on auto.fun with a bonding curve. Tokens appear on https://auto.fun after launch.",
+  {
+    name: z.string().describe("Token name (e.g. 'Moon Dog')"),
+    symbol: z.string().describe("Token ticker symbol (e.g. 'MOON')"),
+    uri: z.string().optional().describe("Metaplex metadata JSON URL (name, symbol, description, image)"),
+    description: z.string().optional().describe("Token description"),
+    imageUrl: z.string().optional().describe("Token image URL"),
+    decimals: z.number().optional().describe("Token decimals (default: 6)"),
+    tokenSupply: z.number().optional().describe("Total token supply in raw units (default: 1B with 6 decimals)"),
+    virtualReserves: z.number().optional().describe("Virtual SOL reserves in lamports (default: 0.1 SOL)"),
+    initialBuySol: z.number().optional().describe("SOL to spend on initial buy (atomic with launch)"),
+    slippageBps: z.number().optional().describe("Slippage tolerance in basis points (default: 500 = 5%)"),
+  },
   async (params) => {
-    const result = await createToken(params);
+    const result = await launchToken(params);
 
     if (!result.success) {
       return {
@@ -97,21 +76,18 @@ server.tool(
     const data = result.data!;
     let text = `**Token Created Successfully!**\n\n`;
     text += `**Name:** ${params.name}\n`;
-    text += `**Symbol:** ${params.symbol}\n`;
-    text += `**Mint Address:** \`${data.mintAddress}\`\n\n`;
+    text += `**Symbol:** ${params.symbol.toUpperCase()}\n`;
+    text += `**Mint Address:** \`${data.mintAddress}\`\n`;
+    text += `**Bonding Curve:** \`${data.bondingCurve}\`\n\n`;
     text += `**Links:**\n`;
-    text += `- [View on Bags.fm](${data.bagsfmUrl})\n`;
+    text += `- [View on auto.fun](${data.autofunUrl})\n`;
     text += `- [View Transaction](${data.explorerUrl})\n`;
 
     if (params.initialBuySol && params.initialBuySol > 0) {
       text += `\n**Initial Buy:** ${params.initialBuySol} SOL`;
-      if (data.tokensReceived) {
-        text += ` -> ${data.tokensReceived} tokens`;
-      }
     }
 
-    text += `\n\nShare this link to let others trade your token!`;
-    text += `\nCreators earn 1% of all trading volume forever.`;
+    text += `\n\nShare the auto.fun link to let others trade your token!`;
 
     return {
       content: [{
@@ -128,8 +104,12 @@ server.tool(
 
 server.tool(
   "buy-token",
-  buyTokenDescription,
-  buyTokenSchema,
+  "Buy tokens from an auto.fun bonding curve using SOL. Fails if curve has graduated to Raydium.",
+  {
+    mintAddress: z.string().describe("Token mint address"),
+    solAmount: z.number().positive().describe("Amount of SOL to spend"),
+    slippageBps: z.number().optional().describe("Slippage tolerance in basis points (default: 500 = 5%)"),
+  },
   async (params) => {
     const result = await buyToken(params);
 
@@ -143,15 +123,12 @@ server.tool(
     }
 
     const data = result.data!;
-    const explorerUrl = getExplorerUrl(data.signature, "tx");
-    const bagsfmUrl = getBagsFmUrl(params.mintAddress);
-
     let text = `**Buy Successful!**\n\n`;
     text += `**Spent:** ${params.solAmount} SOL\n`;
-    text += `**Received:** ${data.tokensReceived} tokens\n\n`;
+    text += `**Estimated Tokens:** ${data.estimatedTokens}\n`;
+    text += `**Min Tokens (with slippage):** ${data.minTokens}\n\n`;
     text += `**Links:**\n`;
-    text += `- [View Transaction](${explorerUrl})\n`;
-    text += `- [View Token](${bagsfmUrl})\n`;
+    text += `- [View Transaction](${data.explorerUrl})\n`;
 
     return {
       content: [{
@@ -168,8 +145,13 @@ server.tool(
 
 server.tool(
   "sell-token",
-  sellTokenDescription,
-  sellTokenSchema,
+  "Sell tokens back to an auto.fun bonding curve for SOL. Use percentage (1-100) or exact tokenAmount.",
+  {
+    mintAddress: z.string().describe("Token mint address"),
+    tokenAmount: z.number().optional().describe("Exact number of tokens to sell"),
+    percentage: z.number().min(1).max(100).optional().describe("Percentage of holdings to sell (1-100)"),
+    slippageBps: z.number().optional().describe("Slippage tolerance in basis points (default: 500 = 5%)"),
+  },
   async (params) => {
     const result = await sellToken(params);
 
@@ -183,13 +165,10 @@ server.tool(
     }
 
     const data = result.data!;
-    const explorerUrl = getExplorerUrl(data.signature, "tx");
-
     let text = `**Sell Successful!**\n\n`;
-    text += `**Sold:** ${data.tokensSold} tokens\n`;
-    text += `**Received:** ${data.solReceived}\n\n`;
+    text += `**Estimated SOL Received:** ${data.estimatedSolReceived}\n\n`;
     text += `**Links:**\n`;
-    text += `- [View Transaction](${explorerUrl})\n`;
+    text += `- [View Transaction](${data.explorerUrl})\n`;
 
     return {
       content: [{
@@ -206,10 +185,12 @@ server.tool(
 
 server.tool(
   "get-balance",
-  getBalanceDescription,
-  getBalanceSchema,
+  "Check wallet SOL balance and all SPL token holdings. Optionally check any address.",
+  {
+    address: z.string().optional().describe("Solana address to check (defaults to configured wallet)"),
+  },
   async (params) => {
-    const result = await getBalance(params);
+    const result = await getBalance(params.address);
 
     if (!result.success) {
       return {
@@ -249,10 +230,12 @@ server.tool(
 
 server.tool(
   "get-token-info",
-  getTokenInfoDescription,
-  getTokenInfoSchema,
+  "Get bonding curve status for an auto.fun token: price, reserves, progress to graduation, and more.",
+  {
+    mintAddress: z.string().describe("Token mint address"),
+  },
   async (params) => {
-    const result = await getTokenInfo(params);
+    const result = await getCurveInfo(params.mintAddress);
 
     if (!result.success) {
       return {
@@ -264,69 +247,22 @@ server.tool(
     }
 
     const data = result.data!;
-    const bagsfmUrl = getBagsFmUrl(data.mint);
-    const explorerUrl = getExplorerUrl(data.mint, "address");
-
     let text = `**Token Info**\n\n`;
-    text += `**Name:** ${data.name}\n`;
-    text += `**Symbol:** ${data.symbol}\n`;
-    text += `**Mint:** \`${data.mint}\`\n`;
+    text += `**Mint:** \`${data.mintAddress}\`\n`;
     text += `**Creator:** \`${data.creator}\`\n`;
-    text += `**Total Supply:** ${data.totalSupply}\n`;
-    text += `**Decimals:** ${data.decimals}\n\n`;
+    text += `**Bonding Curve:** \`${data.bondingCurve}\`\n\n`;
 
     text += `**Market:**\n`;
-    text += `- Progress: ${data.bondingCurveProgress.toFixed(2)}%\n`;
-    text += `- Price: ${data.priceInSol} SOL\n`;
-    text += `- Market Cap: ${data.marketCap} SOL\n`;
-    text += `- Graduated: ${data.isGraduated ? "Yes" : "No"}\n\n`;
+    text += `- Price: ${data.priceInSol} SOL per token\n`;
+    text += `- SOL Reserves: ${data.reserveSol} SOL\n`;
+    text += `- Token Reserves: ${data.reserveTokens}\n`;
+    text += `- Curve Limit: ${data.curveLimitSol} SOL\n`;
+    text += `- Progress: ${data.progress}\n`;
+    text += `- Graduated: ${data.isCompleted ? "Yes (trade on Raydium)" : "No (bonding curve active)"}\n\n`;
 
     text += `**Links:**\n`;
-    text += `- [Bags.fm](${bagsfmUrl})\n`;
-    text += `- [Explorer](${explorerUrl})\n`;
-
-    return {
-      content: [{
-        type: "text" as const,
-        text,
-      }],
-    };
-  }
-);
-
-// =============================================================================
-// Tool: get-bonding-curve
-// =============================================================================
-
-server.tool(
-  "get-bonding-curve",
-  getBondingCurveDescription,
-  getBondingCurveSchema,
-  async (params) => {
-    const result = await getBondingCurve(params);
-
-    if (!result.success) {
-      return {
-        content: [{
-          type: "text" as const,
-          text: `**Error:** ${result.error}`,
-        }],
-      };
-    }
-
-    const data = result.data!;
-
-    let text = `**Bonding Curve Status**\n\n`;
-    text += `**Token:** \`${data.mint}\`\n`;
-    text += `**Curve Address:** \`${data.curveAddress}\`\n`;
-    if (data.creator) {
-      text += `**Creator:** \`${data.creator}\`\n`;
-    }
-    text += `\n`;
-
-    text += `**Progress:** ${data.progress.toFixed(2)}% ${data.isComplete ? "(GRADUATED)" : ""}\n`;
-    text += `**Current Price:** ${data.currentPrice} SOL per token\n`;
-    text += `**Market Cap:** ${data.marketCap} SOL\n`;
+    text += `- [auto.fun](${data.autofunUrl})\n`;
+    text += `- [Explorer](${data.explorerUrl})\n`;
 
     return {
       content: [{
@@ -343,12 +279,11 @@ server.tool(
 
 server.tool(
   "server-status",
-  "Check ClaudeCandle server status, Bags.fm API configuration, and available tools",
+  "Check ClaudeCandle server status, RPC connection, wallet, and available tools",
   {},
   async () => {
     const network = getNetwork();
     const isMain = isMainnet();
-    const apiConfigured = isSDKConfigured();
 
     let walletStatus = "Not configured";
     let walletAddress = "N/A";
@@ -379,10 +314,9 @@ server.tool(
     }
 
     let text = `**ClaudeCandle Server Status**\n\n`;
-    text += `**Version:** 1.0.0\n`;
-    text += `**Platform:** Bags.fm\n`;
+    text += `**Version:** 2.0.0\n`;
+    text += `**Platform:** auto.fun (on-chain)\n`;
     text += `**Network:** ${network} ${isMain ? "(MAINNET)" : "(devnet)"}\n`;
-    text += `**Bags API:** ${apiConfigured ? "Configured" : "NOT CONFIGURED - Set BAGS_API_KEY"}\n`;
     text += `**RPC:** ${rpcStatus}\n`;
     text += `**Wallet:** ${walletStatus}\n`;
 
@@ -392,17 +326,12 @@ server.tool(
     }
 
     text += `\n**Available Tools:**\n`;
-    text += `- \`create-token\` - Create new tokens on Bags.fm\n`;
-    text += `- \`buy-token\` - Buy tokens via Bags.fm\n`;
-    text += `- \`sell-token\` - Sell tokens via Bags.fm\n`;
+    text += `- \`create-token\` - Launch new tokens on auto.fun\n`;
+    text += `- \`buy-token\` - Buy tokens from bonding curve\n`;
+    text += `- \`sell-token\` - Sell tokens back to bonding curve\n`;
     text += `- \`get-balance\` - Check wallet balances\n`;
-    text += `- \`get-token-info\` - Get token information\n`;
-    text += `- \`get-bonding-curve\` - Check curve status\n`;
+    text += `- \`get-token-info\` - Get bonding curve status\n`;
     text += `- \`server-status\` - This status check\n`;
-
-    if (!apiConfigured) {
-      text += `\n**Setup Required:** Get your API key from https://dev.bags.fm`;
-    }
 
     if (isMain) {
       text += `\n**Warning:** You are connected to MAINNET. Real funds will be used!`;
@@ -425,9 +354,8 @@ async function main() {
   const transport = new StdioServerTransport();
 
   console.error("ClaudeCandle MCP Server starting...");
-  console.error(`   Platform: Bags.fm`);
+  console.error(`   Platform: auto.fun (on-chain)`);
   console.error(`   Network: ${getNetwork()}`);
-  console.error(`   Bags API: ${isSDKConfigured() ? "Configured" : "NOT CONFIGURED"}`);
 
   try {
     const wallet = loadKeypair();
@@ -440,7 +368,7 @@ async function main() {
 
   await server.connect(transport);
   console.error("ClaudeCandle MCP Server running!");
-  console.error("   Tools: create-token, buy-token, sell-token, get-balance, get-token-info, get-bonding-curve, server-status");
+  console.error("   Tools: create-token, buy-token, sell-token, get-balance, get-token-info, server-status");
 }
 
 main().catch((error) => {

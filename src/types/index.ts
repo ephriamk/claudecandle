@@ -1,10 +1,10 @@
 /**
  * ClaudeCandle Type Definitions
- * Types for Bags.fm integration via MCP server
+ * Types for auto.fun integration (MCP server + CLI scripts)
  */
 
 // =============================================================================
-// Tool Response Types
+// Tool Response
 // =============================================================================
 
 export interface ToolResponse<T = unknown> {
@@ -14,167 +14,84 @@ export interface ToolResponse<T = unknown> {
 }
 
 // =============================================================================
-// Fee Share Types (Bags.fm Creator Royalties)
+// Launch Types
 // =============================================================================
 
-export interface FeeShare {
-  wallet: string;
-  percentage: number; // Percentage (0-100), not basis points
-}
-
-export interface FeeClaimer {
-  provider: string; // e.g., "twitter", "telegram"
-  username: string;
-  bps: number; // Basis points (10000 = 100%)
-}
-
-// =============================================================================
-// Token Types
-// =============================================================================
-
-export interface CreateTokenParams {
+export interface LaunchParams {
   name: string;
   symbol: string;
+  uri?: string;
   description?: string;
   imageUrl?: string;
-  twitter?: string;
-  telegram?: string;
-  website?: string;
+  decimals?: number;
+  tokenSupply?: number;
+  virtualReserves?: number;
   initialBuySol?: number;
   slippageBps?: number;
-  feeShares?: FeeShare[];
 }
 
-export interface CreateTokenResult {
+export interface LaunchResult {
   mintAddress: string;
   signature: string;
+  bondingCurve: string;
   explorerUrl: string;
-  bagsfmUrl: string;
-  tokensReceived?: string;
+  autofunUrl: string;
 }
 
-export interface BuyTokenParams {
+// =============================================================================
+// Trade Types
+// =============================================================================
+
+export interface BuyParams {
   mintAddress: string;
   solAmount: number;
   slippageBps?: number;
 }
 
-export interface BuyTokenResult {
+export interface BuyResult {
   signature: string;
-  tokensReceived: string;
-  pricePerToken: string;
-  totalCost: string;
+  estimatedTokens: string;
+  minTokens: string;
+  explorerUrl: string;
 }
 
-export interface SellTokenParams {
+export interface SellParams {
   mintAddress: string;
   tokenAmount?: number;
   percentage?: number;
   slippageBps?: number;
 }
 
-export interface SellTokenResult {
+export interface SellResult {
   signature: string;
-  solReceived: string;
-  tokensSold: string;
-  pricePerToken: string;
+  estimatedSolReceived: string;
+  explorerUrl: string;
 }
 
 // =============================================================================
 // Query Types
 // =============================================================================
 
-export interface TokenInfo {
-  mint: string;
-  name: string;
-  symbol: string;
-  description: string;
-  imageUrl: string;
+export interface CurveInfo {
+  mintAddress: string;
   creator: string;
-  createdAt?: string;
-  totalSupply: string;
-  decimals: number;
-  bondingCurveProgress: number;
-  marketCap: string;
+  bondingCurve: string;
+  reserveSol: string;
+  reserveTokens: string;
   priceInSol: string;
-  priceInUsd?: string;
-  holders?: number;
-  isGraduated: boolean;
-  poolAddress?: string;
+  curveLimitSol: string;
+  progress: string;
+  isCompleted: boolean;
+  autofunUrl: string;
+  explorerUrl: string;
 }
 
-export interface BondingCurveInfo {
-  mint: string;
-  curveAddress: string;
-  progress: number;
-  currentPrice: string;
-  marketCap: string;
-  isComplete: boolean;
-  creator?: string;
-}
-
-export interface TokenBalance {
-  mint: string;
-  symbol: string;
-  name: string;
-  balance: string;
-  balanceRaw: string;
-  decimals: number;
-  valueInSol?: string;
-  valueInUsd?: string;
-}
-
-export interface WalletBalance {
+export interface BalanceResult {
   address: string;
   solBalance: string;
-  solBalanceRaw: string;
-  solBalanceUsd?: string;
-  tokens: TokenBalance[];
-  totalValueUsd?: string;
-}
-
-// =============================================================================
-// Trade Quote Types
-// =============================================================================
-
-export interface TradeQuote {
-  inputMint: string;
-  outputMint: string;
-  inputAmount: string;
-  expectedOutput: string;
-  minOutput: string;
-  priceImpact: number;
-  route?: string[];
-}
-
-// =============================================================================
-// Configuration Types
-// =============================================================================
-
-export interface AppConfig {
-  bagsApiKey: string;
-  rpcUrl: string;
-  network: "mainnet-beta" | "devnet";
-  defaultSlippageBps: number;
-  logLevel: "debug" | "info" | "warn" | "error";
-}
-
-// =============================================================================
-// Priority Fee Types
-// =============================================================================
-
-export type PriorityLevel = "min" | "low" | "medium" | "high" | "veryHigh" | "unsafeMax";
-
-export type NetworkName = "mainnet-beta" | "devnet" | "testnet";
-
-export interface PriorityFeeEstimate {
-  priorityFeeEstimate: number;
-  priorityFeeLevels?: {
-    min: number;
-    low: number;
-    medium: number;
-    high: number;
-    veryHigh: number;
-    unsafeMax: number;
-  };
+  tokens: Array<{
+    mint: string;
+    balance: string;
+    decimals: number;
+  }>;
 }
