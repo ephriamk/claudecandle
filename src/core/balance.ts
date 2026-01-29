@@ -11,8 +11,13 @@ import type { ToolResponse, BalanceResult } from "../types/index.js";
 
 export async function getBalance(address?: string): Promise<ToolResponse<BalanceResult>> {
   try {
-    const wallet = loadKeypair();
-    const pubkey = address ? new PublicKey(address) : wallet.publicKey;
+    let pubkey: PublicKey;
+    if (address) {
+      pubkey = new PublicKey(address);
+    } else {
+      const wallet = loadKeypair();
+      pubkey = wallet.publicKey;
+    }
     const conn = getConnection();
 
     const solBalance = await getSolBalance(pubkey);

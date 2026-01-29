@@ -2,18 +2,47 @@
 
 You can create and trade meme coins on Solana using auto.fun's bonding curve contracts.
 
+## Mainnet Only
+
+auto.fun's bonding curve program (`autoUmixaMaYKFjexMpQuBpNYntgbkzCo2b1ZqUaAZ5`) is deployed on **Solana mainnet only**. There is no devnet deployment.
+
+- **Read-only operations** (balance, token info) cost zero SOL and need no funded wallet
+- **Transactions** (launch, buy, sell) require a funded wallet with real SOL
+
 ## Setup
 
-Requires `.env` with:
-- `HELIUS_RPC_URL` — Helius RPC endpoint (mainnet or devnet)
-- `WALLET_PRIVATE_KEY` — base58 encoded Solana keypair
+### 1. Generate a wallet
+
+```bash
+npx tsx scripts/setup.ts
+```
+
+Outputs a new keypair (publicKey + privateKey). Copy the values into `.env`.
+
+### 2. Create `.env`
+
+```
+HELIUS_RPC_URL=https://api.mainnet-beta.solana.com
+WALLET_PRIVATE_KEY=<your_base58_private_key>
+SOLANA_NETWORK=mainnet-beta
+```
 
 No API key needed. Transactions go directly to the auto.fun program on Solana.
+Fund the wallet with SOL before launching or trading tokens.
 
 ## Available Scripts
 
 All scripts: `npx tsx scripts/<name>.ts '<json_args>'`
 Output: JSON to stdout. Logs to stderr.
+
+### Setup (Generate Wallet)
+
+```bash
+npx tsx scripts/setup.ts
+```
+
+Output: `{ success, publicKey, privateKey }`
+No arguments needed. Generates a fresh Solana keypair.
 
 ### Launch a Token
 

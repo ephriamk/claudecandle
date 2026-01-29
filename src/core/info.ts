@@ -7,17 +7,15 @@ import { PublicKey } from "@solana/web3.js";
 import anchor from "@coral-xyz/anchor";
 const { BN } = anchor;
 type BN = InstanceType<typeof BN>;
-import { getProgram, getBondingCurvePda } from "../services/program.js";
+import { getReadOnlyProgram, getBondingCurvePda } from "../services/program.js";
 import { getConnection, lamportsToSol, getExplorerUrl, getAutofunUrl } from "../services/solana.js";
-import { loadKeypair } from "../utils/keypair.js";
 import { TOKEN_DECIMALS, ERROR_MESSAGES } from "../config/constants.js";
 import type { ToolResponse, CurveInfo } from "../types/index.js";
 
 export async function getCurveInfo(mintAddress: string): Promise<ToolResponse<CurveInfo>> {
   try {
-    const wallet = loadKeypair();
     const conn = getConnection();
-    const program = getProgram(conn, wallet);
+    const program = getReadOnlyProgram(conn);
     const mint = new PublicKey(mintAddress);
 
     const curvePda = getBondingCurvePda(mint);

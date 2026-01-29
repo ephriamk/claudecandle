@@ -359,9 +359,13 @@ async function main() {
 
   try {
     const wallet = loadKeypair();
-    const balance = await getSolBalance(wallet.publicKey);
     console.error(`   Wallet: ${getPublicKeyString(wallet)}`);
-    console.error(`   Balance: ${balance.toFixed(4)} SOL`);
+    try {
+      const balance = await getSolBalance(wallet.publicKey);
+      console.error(`   Balance: ${balance.toFixed(4)} SOL`);
+    } catch {
+      console.error("   Balance: Unable to fetch (RPC unavailable)");
+    }
   } catch {
     console.error("   Wallet: Not configured (set WALLET_PRIVATE_KEY)");
   }

@@ -32,6 +32,21 @@ export function getProgram(connection: Connection, wallet: Keypair): Program {
   return new Program(idl as Idl, provider);
 }
 
+/**
+ * Create a read-only Anchor Program client (no wallet needed).
+ * Uses a throwaway keypair to satisfy AnchorProvider's constructor.
+ * The keypair is never used for signing — only for account deserialization.
+ */
+export function getReadOnlyProgram(connection: Connection): Program {
+  const dummyKeypair = Keypair.generate();
+  const provider = new AnchorProvider(
+    connection,
+    new Wallet(dummyKeypair),
+    { skipPreflight: false, commitment: "confirmed" }
+  );
+  return new Program(idl as Idl, provider);
+}
+
 // =============================================================================
 // PDA Helpers — seeds verified from IDL byte arrays
 // =============================================================================

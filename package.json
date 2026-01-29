@@ -13,6 +13,7 @@
     "sell": "npx tsx scripts/sell.ts",
     "balance": "npx tsx scripts/balance.ts",
     "info": "npx tsx scripts/info.ts",
+    "setup": "npx tsx scripts/setup.ts",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run build"
   },
