@@ -39,6 +39,31 @@ export interface LaunchResult {
 }
 
 // =============================================================================
+// Raydium Launch Types
+// =============================================================================
+
+export interface RaydiumLaunchParams {
+  name: string;
+  symbol: string;
+  description?: string;
+  imageUrl?: string;
+  uri?: string;
+  decimals?: number;
+  totalSupply?: number;
+  liquiditySol: number;
+  liquidityPercent?: number;
+}
+
+export interface RaydiumLaunchResult {
+  mintAddress: string;
+  poolId: string;
+  lpMint: string;
+  signature: string;
+  jupiterUrl: string;
+  explorerUrl: string;
+}
+
+// =============================================================================
 // Trade Types
 // =============================================================================
 

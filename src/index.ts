@@ -7,6 +7,7 @@
  * bonding curve contracts through natural language conversations.
  *
  * Tools:
+ * - launch-token-raydium: Launch token with Raydium CPMM pool (Jupiter-tradeable)
  * - create-token: Launch new tokens on auto.fun
  * - buy-token: Buy tokens with SOL
  * - sell-token: Sell tokens for SOL
@@ -25,6 +26,7 @@ dotenv.config();
 
 // Import core logic
 import { launchToken } from "./core/launch.js";
+import { launchOnRaydium } from "./core/raydium-launch.js";
 import { buyToken, sellToken } from "./core/trade.js";
 import { getCurveInfo } from "./core/info.js";
 import { getBalance } from "./core/balance.js";
@@ -41,6 +43,57 @@ const server = new McpServer({
   name: "claudecandle",
   version: "2.0.0",
 });
+
+// =============================================================================
+// Tool: launch-token-raydium
+// =============================================================================
+
+server.tool(
+  "launch-token-raydium",
+  "Launch a new token with a Raydium CPMM pool. Immediately tradeable on Jupiter. Recommended over auto.fun for visibility.",
+  {
+    name: z.string().describe("Token name (e.g. 'Moon Dog')"),
+    symbol: z.string().describe("Token ticker symbol (e.g. 'MOON')"),
+    liquiditySol: z.number().positive().describe("SOL to put in the liquidity pool"),
+    description: z.string().optional().describe("Token description (uploaded to IPFS if PINATA_JWT set)"),
+    imageUrl: z.string().optional().describe("Token image URL (included in metadata)"),
+    uri: z.string().optional().describe("Metaplex metadata JSON URL (auto-generated if description/imageUrl provided)"),
+    totalSupply: z.number().optional().describe("Total token supply (default: 1,000,000,000)"),
+    liquidityPercent: z.number().min(1).max(100).optional().describe("% of supply to put in pool (default: 50%)"),
+    decimals: z.number().optional().describe("Token decimals (default: 6)"),
+  },
+  async (params) => {
+    const result = await launchOnRaydium(params);
+
+    if (!result.success) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: `**Raydium Launch Failed**\n\nError: ${result.error}`,
+        }],
+      };
+    }
+
+    const data = result.data!;
+    let text = `**Token Launched on Raydium!**\n\n`;
+    text += `**Name:** ${params.name}\n`;
+    text += `**Symbol:** ${params.symbol.toUpperCase()}\n`;
+    text += `**Mint Address:** \`${data.mintAddress}\`\n`;
+    text += `**Pool ID:** \`${data.poolId}\`\n`;
+    text += `**Liquidity:** ${params.liquiditySol} SOL\n\n`;
+    text += `**Links:**\n`;
+    text += `- [Trade on Jupiter](${data.jupiterUrl})\n`;
+    text += `- [View Transaction](${data.explorerUrl})\n`;
+    text += `\nThe token is now live and tradeable on Jupiter!`;
+
+    return {
+      content: [{
+        type: "text" as const,
+        text,
+      }],
+    };
+  }
+);
 
 // =============================================================================
 // Tool: create-token
@@ -354,7 +407,7 @@ async function main() {
   const transport = new StdioServerTransport();
 
   console.error("ClaudeCandle MCP Server starting...");
-  console.error(`   Platform: auto.fun (on-chain)`);
+  console.error(`   Platform: Raydium + auto.fun (on-chain)`);
   console.error(`   Network: ${getNetwork()}`);
 
   try {
@@ -372,7 +425,7 @@ async function main() {
 
   await server.connect(transport);
   console.error("ClaudeCandle MCP Server running!");
-  console.error("   Tools: create-token, buy-token, sell-token, get-balance, get-token-info, server-status");
+  console.error("   Tools: launch-token-raydium, create-token, buy-token, sell-token, get-balance, get-token-info, server-status");
 }
 
 main().catch((error) => {

@@ -1,10 +1,13 @@
 # ClaudeCandle — Solana Meme Coin Launchpad Skill
 
-You can create and trade meme coins on Solana using auto.fun's bonding curve contracts.
+You can create and trade meme coins on Solana. Two launch paths:
+
+1. **Raydium CPMM** (recommended) — Token is immediately tradeable on Jupiter. ~0.3 SOL infra + your liquidity.
+2. **auto.fun bonding curve** — Token appears on auto.fun. Graduates to Raydium when curve fills.
 
 ## Mainnet Only
 
-auto.fun's bonding curve program (`autoUmixaMaYKFjexMpQuBpNYntgbkzCo2b1ZqUaAZ5`) is deployed on **Solana mainnet only**. There is no devnet deployment.
+All programs are deployed on **Solana mainnet only**. There is no devnet deployment.
 
 - **Read-only operations** (balance, token info) cost zero SOL and need no funded wallet
 - **Transactions** (launch, buy, sell) require a funded wallet with real SOL
@@ -27,8 +30,17 @@ WALLET_PRIVATE_KEY=<your_base58_private_key>
 SOLANA_NETWORK=mainnet-beta
 ```
 
-No API key needed. Transactions go directly to the auto.fun program on Solana.
+No API key needed. Transactions go directly on-chain.
 Fund the wallet with SOL before launching or trading tokens.
+
+### 3. Optional: Pinata IPFS (for metadata with images)
+
+Add to `.env`:
+```
+PINATA_JWT=your_pinata_jwt_here
+```
+
+Get a free JWT at https://app.pinata.cloud/developers/api-keys. Without this, you can still launch tokens but must provide your own metadata URI.
 
 ## Available Scripts
 
@@ -44,19 +56,34 @@ npx tsx scripts/setup.ts
 Output: `{ success, publicKey, privateKey }`
 No arguments needed. Generates a fresh Solana keypair.
 
-### Launch a Token
+### Launch on Raydium (Recommended)
+
+```bash
+npx tsx scripts/raydium-launch.ts '{"name":"Moon Dog","symbol":"MOON","liquiditySol":5}'
+```
+
+Required: `name`, `symbol`, `liquiditySol`
+Optional: `description`, `imageUrl`, `uri`, `totalSupply` (default 1B), `liquidityPercent` (default 50%), `decimals` (default 6)
+
+Output: `{ success, mintAddress, poolId, lpMint, signature, jupiterUrl, explorerUrl }`
+
+Creates an SPL token with Metaplex metadata, then opens a Raydium CPMM pool paired with SOL. The token is immediately tradeable on Jupiter. Cost: ~0.3 SOL infrastructure + your liquidity SOL.
+
+If `description` or `imageUrl` is provided and `PINATA_JWT` is set, metadata is auto-uploaded to IPFS.
+
+### Launch on auto.fun
 
 ```bash
 npx tsx scripts/launch.ts '{"name":"Moon Dog","symbol":"MOON","uri":"https://..."}'
 ```
 
 Required: `name`, `symbol`
-Optional: `uri` (metadata JSON URL), `initialBuySol`, `decimals` (default 6), `tokenSupply` (default 1B), `virtualReserves` (default 0.1 SOL), `slippageBps`
+Optional: `uri` (metadata JSON URL), `description`, `imageUrl`, `initialBuySol`, `decimals` (default 6), `tokenSupply` (default 1B), `virtualReserves` (default 0.1 SOL), `slippageBps`
 
 Output: `{ success, mintAddress, signature, bondingCurve, explorerUrl, autofunUrl }`
 
 If `initialBuySol > 0`, uses `launchAndSwap` for atomic creation + buy.
-The `uri` should point to a Metaplex-standard JSON file with name, symbol, description, image.
+If `description` or `imageUrl` is provided and `PINATA_JWT` is set, metadata is auto-uploaded to IPFS.
 
 ### Buy Tokens
 
@@ -107,7 +134,7 @@ This project also runs as an MCP server for Claude Desktop or other MCP clients:
 npm run build && node dist/index.js
 ```
 
-MCP tools: `create-token`, `buy-token`, `sell-token`, `get-balance`, `get-token-info`, `server-status`
+MCP tools: `launch-token-raydium`, `create-token`, `buy-token`, `sell-token`, `get-balance`, `get-token-info`, `server-status`
 
 ## Bonding Curve Math
 
@@ -125,8 +152,8 @@ Scripts exit 0 with `{ success: true, ... }` or exit 1 with `{ success: false, e
 ## Notes
 
 - Tokens use standard SPL Token (not Token2022)
-- Bonding curve program: `autoUmixaMaYKFjexMpQuBpNYntgbkzCo2b1ZqUaAZ5` (auto.fun / elizaOS)
-- Tokens appear on https://auto.fun after launch
-- After graduation, tokens trade on Raydium AMM
+- **Raydium launch** creates a CPMM pool — token is immediately on Jupiter
+- **auto.fun launch** uses bonding curve program `autoUmixaMaYKFjexMpQuBpNYntgbkzCo2b1ZqUaAZ5`; tokens appear on https://auto.fun and graduate to Raydium when curve fills
 - Default 5% slippage, configurable via `slippageBps`
 - All amounts in raw units unless noted (SOL in lamports, tokens with decimals applied)
+- Metadata (name, symbol, description, image) is uploaded to IPFS via Pinata when `PINATA_JWT` is set

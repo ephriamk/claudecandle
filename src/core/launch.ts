@@ -51,7 +51,13 @@ export async function launchToken(params: LaunchParams): Promise<ToolResponse<La
 
     const name = params.name;
     const symbol = params.symbol.toUpperCase();
-    const uri = params.uri || "";
+    let uri = params.uri || "";
+    if (!uri && (params.description || params.imageUrl)) {
+      const { generateMetaplexJson, uploadMetadataToIPFS } = await import("../services/metadata.js");
+      const metadata = generateMetaplexJson(name, symbol, params.description, params.imageUrl);
+      uri = await uploadMetadataToIPFS(metadata);
+      console.error(`  Metadata URI: ${uri}`);
+    }
 
     console.error(`Launching ${name} (${symbol})...`);
     console.error(`  Mint: ${mint.publicKey.toBase58()}`);

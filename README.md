@@ -1,8 +1,8 @@
 # ClaudeCandle
 
-MCP server and CLI tools for launching and trading Solana meme coins on [auto.fun](https://auto.fun).
+MCP server and CLI tools for launching and trading Solana meme coins.
 
-Create tokens with bonding curves, buy, sell, and check prices — from Claude Desktop, Claude Code, or the command line.
+Create tokens with Raydium CPMM pools (instantly tradeable on Jupiter) or auto.fun bonding curves — from Claude Desktop, Claude Code, or the command line.
 
 ## Quick Start
 
@@ -38,7 +38,8 @@ Create tokens with bonding curves, buy, sell, and check prices — from Claude D
          "env": {
            "HELIUS_RPC_URL": "https://api.mainnet-beta.solana.com",
            "WALLET_PRIVATE_KEY": "<your_base58_private_key>",
-           "SOLANA_NETWORK": "mainnet-beta"
+           "SOLANA_NETWORK": "mainnet-beta",
+           "PINATA_JWT": "<optional_pinata_jwt_for_metadata>"
          }
        }
      }
@@ -78,7 +79,13 @@ Create tokens with bonding curves, buy, sell, and check prices — from Claude D
 3. **Run scripts**
 
    ```bash
+   # Launch on Raydium (immediately tradeable on Jupiter)
+   npx tsx scripts/raydium-launch.ts '{"name":"Moon Dog","symbol":"MOON","liquiditySol":5}'
+
+   # Launch on auto.fun (bonding curve)
    npx tsx scripts/launch.ts '{"name":"Moon Dog","symbol":"MOON"}'
+
+   # Trade and check
    npx tsx scripts/buy.ts '{"mintAddress":"...","solAmount":0.5}'
    npx tsx scripts/sell.ts '{"mintAddress":"...","percentage":100}'
    npx tsx scripts/balance.ts
@@ -87,9 +94,19 @@ Create tokens with bonding curves, buy, sell, and check prices — from Claude D
 
    All scripts output JSON to stdout and logs to stderr.
 
+## Metadata (Images & Descriptions)
+
+To include token descriptions and images, set `PINATA_JWT` in your `.env` or MCP config:
+
+```
+PINATA_JWT=your_pinata_jwt_here
+```
+
+Get a free JWT at [pinata.cloud](https://app.pinata.cloud/developers/api-keys). Then just pass `description` and `imageUrl` — metadata is auto-uploaded to IPFS.
+
 ## Mainnet Only
 
-auto.fun's bonding curve program is deployed on **Solana mainnet only**. There is no devnet deployment.
+All programs are deployed on **Solana mainnet only**. There is no devnet deployment.
 
 - **Read-only operations** (balance, token info) are free and need no funded wallet.
 - **Transactions** (launch, buy, sell) require a funded wallet with real SOL.
@@ -106,6 +123,7 @@ HELIUS_RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_KEY
 
 | Tool | Description |
 |------|-------------|
+| `launch-token-raydium` | Launch token with Raydium CPMM pool (tradeable on Jupiter immediately) |
 | `create-token` | Launch a new token with bonding curve on auto.fun |
 | `buy-token` | Buy tokens from a bonding curve with SOL |
 | `sell-token` | Sell tokens back to a bonding curve for SOL |
