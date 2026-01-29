@@ -3,6 +3,9 @@
   "version": "2.0.0",
   "description": "MCP server and Claude Code skill for launching and trading Solana meme coins on auto.fun",
   "main": "dist/index.js",
+  "bin": {
+    "claudecandle": "./dist/index.js"
+  },
   "type": "module",
   "scripts": {
     "build": "tsc",
@@ -50,6 +53,8 @@
     "dist",
     "idl",
     "scripts",
-    "CLAUDE.md"
+    "CLAUDE.md",
+    "README.md",
+    "LICENSE"
   ]
 }
