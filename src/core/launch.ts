@@ -3,7 +3,7 @@
  * Creates a new token with bonding curve on auto.fun via a single Anchor transaction.
  */
 
-import { Keypair, PublicKey } from "@solana/web3.js";
+import { Keypair, PublicKey, ComputeBudgetProgram } from "@solana/web3.js";
 import anchor from "@coral-xyz/anchor";
 const { BN } = anchor;
 type BN = InstanceType<typeof BN>;
@@ -81,6 +81,9 @@ export async function launchToken(params: LaunchParams): Promise<ToolResponse<La
           token: mint.publicKey,
           teamWallet: config.teamWallet,
         })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
+        ])
         .signers([wallet, mint])
         .rpc();
     } else {
@@ -99,6 +102,9 @@ export async function launchToken(params: LaunchParams): Promise<ToolResponse<La
           token: mint.publicKey,
           teamWallet: config.teamWallet,
         })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
+        ])
         .signers([wallet, mint])
         .rpc();
     }

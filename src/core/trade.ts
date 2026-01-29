@@ -4,7 +4,7 @@
  * Constant product formula: xy = k
  */
 
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, ComputeBudgetProgram } from "@solana/web3.js";
 import anchor from "@coral-xyz/anchor";
 const { BN } = anchor;
 type BN = InstanceType<typeof BN>;
@@ -75,6 +75,9 @@ export async function buyToken(params: BuyParams): Promise<ToolResponse<BuyResul
         tokenMint: mint,
         teamWallet: config.teamWallet,
       })
+      .preInstructions([
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }),
+      ])
       .signers([wallet])
       .rpc();
 
@@ -161,6 +164,9 @@ export async function sellToken(params: SellParams): Promise<ToolResponse<SellRe
         tokenMint: mint,
         teamWallet: config.teamWallet,
       })
+      .preInstructions([
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }),
+      ])
       .signers([wallet])
       .rpc();
 
