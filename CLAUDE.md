@@ -1,9 +1,12 @@
 # ClaudeCandle — Solana Meme Coin Launchpad Skill
 
-You can create and trade meme coins on Solana. Two launch paths:
+You can create and trade meme coins on Solana. Five launch paths:
 
-1. **Raydium CPMM** (recommended) — Token is immediately tradeable on Jupiter. ~0.3 SOL infra + your liquidity.
-2. **auto.fun bonding curve** — Token appears on auto.fun. Graduates to Raydium when curve fills.
+1. **Raydium CPMM** (recommended for instant Jupiter) — Token is immediately tradeable on Jupiter. ~0.3 SOL infra + your liquidity.
+2. **Pump.fun** (biggest market, 73%) — Bonding curve on the #1 Solana launchpad. Graduates to PumpSwap/Jupiter at ~85 SOL.
+3. **Meteora DBC** — Dynamic bonding curve (powers Believe, Bags, daos.fun). Graduates to Meteora DAMM v2.
+4. **Raydium LaunchLab** — Bonding curve that graduates to Raydium CPMM at ~85 SOL.
+5. **auto.fun** — Bonding curve on auto.fun. Graduates to Raydium when curve fills.
 
 ## Mainnet Only
 
@@ -71,6 +74,48 @@ Creates an SPL token with Metaplex metadata, then opens a Raydium CPMM pool pair
 
 If `description` or `imageUrl` is provided and `PINATA_JWT` is set, metadata is auto-uploaded to IPFS.
 
+### Launch on Pump.fun
+
+```bash
+npx tsx scripts/pumpfun-launch.ts '{"name":"Moon Dog","symbol":"MOON"}'
+npx tsx scripts/pumpfun-launch.ts '{"name":"Moon Dog","symbol":"MOON","initialBuySol":0.5,"description":"The moonest dog"}'
+```
+
+Required: `name`, `symbol`
+Optional: `description`, `imageUrl`, `uri`, `initialBuySol`, `slippageBps` (default 500)
+
+Output: `{ success, mintAddress, signature, bondingCurve, pumpfunUrl, explorerUrl }`
+
+Creates a token on Pump.fun's bonding curve — the #1 Solana launchpad by volume (73%+ market share). Free to create. 1% protocol fee on trades. Graduates to PumpSwap AMM when ~85 SOL is raised, then routed through Jupiter. If `imageUrl` is provided, the image is uploaded to Pump.fun's IPFS.
+
+### Launch on Meteora DBC
+
+```bash
+npx tsx scripts/meteora-launch.ts '{"name":"Moon Dog","symbol":"MOON"}'
+npx tsx scripts/meteora-launch.ts '{"name":"Moon Dog","symbol":"MOON","initialBuySol":0.5}'
+```
+
+Required: `name`, `symbol`
+Optional: `description`, `imageUrl`, `uri`, `totalSupply` (default 1B), `decimals` (default 6), `initialBuySol`
+
+Output: `{ success, mintAddress, poolAddress, signature, explorerUrl }`
+
+Creates a token with a Meteora Dynamic Bonding Curve — the infrastructure powering Believe, Bags, and daos.fun. Configurable curve shape with concentrated liquidity segments. Graduates to Meteora DAMM v2 pool when migration threshold is met. 1% base trading fee.
+
+### Launch on Raydium LaunchLab
+
+```bash
+npx tsx scripts/launchlab-launch.ts '{"name":"Moon Dog","symbol":"MOON"}'
+npx tsx scripts/launchlab-launch.ts '{"name":"Moon Dog","symbol":"MOON","initialBuySol":0.5,"migrateType":"cpmm"}'
+```
+
+Required: `name`, `symbol`
+Optional: `description`, `imageUrl`, `uri`, `initialBuySol`, `slippageBps`, `migrateType` ("cpmm" or "amm", default "cpmm")
+
+Output: `{ success, mintAddress, poolId, signature, explorerUrl }`
+
+Creates a token on Raydium LaunchLab bonding curve. Uses the same Raydium SDK as the CPMM launch. Constant product curve sells ~79.31% of supply on curve. Graduates to Raydium CPMM (or AMM) pool when ~85 SOL is raised, then tradeable on Jupiter.
+
 ### Launch on auto.fun
 
 ```bash
@@ -134,7 +179,7 @@ This project also runs as an MCP server for Claude Desktop or other MCP clients:
 npm run build && node dist/index.js
 ```
 
-MCP tools: `launch-token-raydium`, `create-token`, `buy-token`, `sell-token`, `get-balance`, `get-token-info`, `server-status`
+MCP tools: `launch-token-raydium`, `launch-token-pumpfun`, `launch-token-meteora`, `launch-token-launchlab`, `create-token`, `buy-token`, `sell-token`, `get-balance`, `get-token-info`, `server-status`
 
 ## Bonding Curve Math
 
@@ -152,8 +197,11 @@ Scripts exit 0 with `{ success: true, ... }` or exit 1 with `{ success: false, e
 ## Notes
 
 - Tokens use standard SPL Token (not Token2022)
-- **Raydium launch** creates a CPMM pool — token is immediately on Jupiter
-- **auto.fun launch** uses bonding curve program `autoUmixaMaYKFjexMpQuBpNYntgbkzCo2b1ZqUaAZ5`; tokens appear on https://auto.fun and graduate to Raydium when curve fills
+- **Raydium CPMM** creates a pool — token is immediately on Jupiter
+- **Pump.fun** uses bonding curve program `6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P`; graduates to PumpSwap at ~85 SOL
+- **Meteora DBC** uses program `dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN`; graduates to Meteora DAMM v2
+- **Raydium LaunchLab** uses program `LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj`; graduates to Raydium CPMM at ~85 SOL
+- **auto.fun** uses bonding curve program `autoUmixaMaYKFjexMpQuBpNYntgbkzCo2b1ZqUaAZ5`; graduates to Raydium when curve fills
 - Default 5% slippage, configurable via `slippageBps`
 - All amounts in raw units unless noted (SOL in lamports, tokens with decimals applied)
-- Metadata (name, symbol, description, image) is uploaded to IPFS via Pinata when `PINATA_JWT` is set
+- Metadata is uploaded to IPFS via Pinata (`PINATA_JWT`) or Pump.fun IPFS (for pump.fun launches with images)

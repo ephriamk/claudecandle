@@ -1,6 +1,6 @@
 /**
  * ClaudeCandle Type Definitions
- * Types for auto.fun integration (MCP server + CLI scripts)
+ * Types for multi-platform Solana meme coin launches + trading
  */
 
 // =============================================================================
@@ -14,7 +14,7 @@ export interface ToolResponse<T = unknown> {
 }
 
 // =============================================================================
-// Launch Types
+// auto.fun Launch Types
 // =============================================================================
 
 export interface LaunchParams {
@@ -39,7 +39,7 @@ export interface LaunchResult {
 }
 
 // =============================================================================
-// Raydium Launch Types
+// Raydium CPMM Launch Types
 // =============================================================================
 
 export interface RaydiumLaunchParams {
@@ -60,6 +60,73 @@ export interface RaydiumLaunchResult {
   lpMint: string;
   signature: string;
   jupiterUrl: string;
+  explorerUrl: string;
+}
+
+// =============================================================================
+// Pump.fun Launch Types
+// =============================================================================
+
+export interface PumpfunLaunchParams {
+  name: string;
+  symbol: string;
+  description?: string;
+  imageUrl?: string;
+  uri?: string;
+  initialBuySol?: number;
+  slippageBps?: number;
+}
+
+export interface PumpfunLaunchResult {
+  mintAddress: string;
+  signature: string;
+  bondingCurve: string;
+  pumpfunUrl: string;
+  explorerUrl: string;
+}
+
+// =============================================================================
+// Meteora DBC Launch Types
+// =============================================================================
+
+export interface MeteoraLaunchParams {
+  name: string;
+  symbol: string;
+  description?: string;
+  imageUrl?: string;
+  uri?: string;
+  totalSupply?: number;
+  decimals?: number;
+  initialBuySol?: number;
+  migrationQuoteSol?: number;
+}
+
+export interface MeteoraLaunchResult {
+  mintAddress: string;
+  poolAddress: string;
+  signature: string;
+  explorerUrl: string;
+}
+
+// =============================================================================
+// Raydium LaunchLab Types
+// =============================================================================
+
+export interface LaunchLabParams {
+  name: string;
+  symbol: string;
+  description?: string;
+  imageUrl?: string;
+  uri?: string;
+  initialBuySol?: number;
+  slippageBps?: number;
+  migrateType?: "amm" | "cpmm";
+}
+
+export interface LaunchLabResult {
+  mintAddress: string;
+  poolId: string;
+  signature: string;
   explorerUrl: string;
 }
 

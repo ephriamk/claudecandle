@@ -7,8 +7,11 @@
  * bonding curve contracts through natural language conversations.
  *
  * Tools:
- * - launch-token-raydium: Launch token with Raydium CPMM pool (Jupiter-tradeable)
- * - create-token: Launch new tokens on auto.fun
+ * - launch-token-raydium: Launch with Raydium CPMM pool (Jupiter-tradeable)
+ * - launch-token-pumpfun: Launch on Pump.fun bonding curve (73% market)
+ * - launch-token-meteora: Launch on Meteora DBC bonding curve
+ * - launch-token-launchlab: Launch on Raydium LaunchLab bonding curve
+ * - create-token: Launch on auto.fun bonding curve
  * - buy-token: Buy tokens with SOL
  * - sell-token: Sell tokens for SOL
  * - get-balance: Check wallet balances
@@ -27,6 +30,9 @@ dotenv.config();
 // Import core logic
 import { launchToken } from "./core/launch.js";
 import { launchOnRaydium } from "./core/raydium-launch.js";
+import { launchOnPumpfun } from "./core/pumpfun-launch.js";
+import { launchOnMeteora } from "./core/meteora-launch.js";
+import { launchOnLaunchLab } from "./core/launchlab-launch.js";
 import { buyToken, sellToken } from "./core/trade.js";
 import { getCurveInfo } from "./core/info.js";
 import { getBalance } from "./core/balance.js";
@@ -85,6 +91,153 @@ server.tool(
     text += `- [Trade on Jupiter](${data.jupiterUrl})\n`;
     text += `- [View Transaction](${data.explorerUrl})\n`;
     text += `\nThe token is now live and tradeable on Jupiter!`;
+
+    return {
+      content: [{
+        type: "text" as const,
+        text,
+      }],
+    };
+  }
+);
+
+// =============================================================================
+// Tool: launch-token-pumpfun
+// =============================================================================
+
+server.tool(
+  "launch-token-pumpfun",
+  "Launch a new token on Pump.fun's bonding curve — the #1 Solana launchpad (73% market share). Graduates to PumpSwap/Jupiter at ~85 SOL.",
+  {
+    name: z.string().describe("Token name (e.g. 'Moon Dog')"),
+    symbol: z.string().describe("Token ticker symbol (e.g. 'MOON')"),
+    description: z.string().optional().describe("Token description"),
+    imageUrl: z.string().optional().describe("Token image URL (uploaded to Pump.fun IPFS)"),
+    uri: z.string().optional().describe("Metadata JSON URL (auto-generated if description/imageUrl provided)"),
+    initialBuySol: z.number().optional().describe("SOL to spend on initial buy (atomic with launch)"),
+    slippageBps: z.number().optional().describe("Slippage tolerance in basis points (default: 500 = 5%)"),
+  },
+  async (params) => {
+    const result = await launchOnPumpfun(params);
+
+    if (!result.success) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: `**Pump.fun Launch Failed**\n\nError: ${result.error}`,
+        }],
+      };
+    }
+
+    const data = result.data!;
+    let text = `**Token Launched on Pump.fun!**\n\n`;
+    text += `**Name:** ${params.name}\n`;
+    text += `**Symbol:** ${params.symbol.toUpperCase()}\n`;
+    text += `**Mint Address:** \`${data.mintAddress}\`\n`;
+    text += `**Bonding Curve:** \`${data.bondingCurve}\`\n\n`;
+    text += `**Links:**\n`;
+    text += `- [View on Pump.fun](${data.pumpfunUrl})\n`;
+    text += `- [View Transaction](${data.explorerUrl})\n`;
+    if (params.initialBuySol && params.initialBuySol > 0) {
+      text += `\n**Initial Buy:** ${params.initialBuySol} SOL`;
+    }
+    text += `\n\nToken trades on Pump.fun bonding curve. Graduates to PumpSwap/Jupiter at ~85 SOL volume.`;
+
+    return {
+      content: [{
+        type: "text" as const,
+        text,
+      }],
+    };
+  }
+);
+
+// =============================================================================
+// Tool: launch-token-meteora
+// =============================================================================
+
+server.tool(
+  "launch-token-meteora",
+  "Launch a new token on Meteora's Dynamic Bonding Curve (DBC). Powers Believe, Bags, and daos.fun. Graduates to Meteora DAMM v2 pool.",
+  {
+    name: z.string().describe("Token name (e.g. 'Moon Dog')"),
+    symbol: z.string().describe("Token ticker symbol (e.g. 'MOON')"),
+    description: z.string().optional().describe("Token description (uploaded to IPFS if PINATA_JWT set)"),
+    imageUrl: z.string().optional().describe("Token image URL (included in metadata)"),
+    uri: z.string().optional().describe("Metadata JSON URL (auto-generated if description/imageUrl provided)"),
+    totalSupply: z.number().optional().describe("Total token supply (default: 1,000,000,000)"),
+    decimals: z.number().optional().describe("Token decimals (default: 6)"),
+    initialBuySol: z.number().optional().describe("SOL to spend on initial buy"),
+  },
+  async (params) => {
+    const result = await launchOnMeteora(params);
+
+    if (!result.success) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: `**Meteora DBC Launch Failed**\n\nError: ${result.error}`,
+        }],
+      };
+    }
+
+    const data = result.data!;
+    let text = `**Token Launched on Meteora DBC!**\n\n`;
+    text += `**Name:** ${params.name}\n`;
+    text += `**Symbol:** ${params.symbol.toUpperCase()}\n`;
+    text += `**Mint Address:** \`${data.mintAddress}\`\n`;
+    text += `**Pool:** \`${data.poolAddress}\`\n\n`;
+    text += `**Links:**\n`;
+    text += `- [View Transaction](${data.explorerUrl})\n`;
+    text += `\nToken trades on Meteora bonding curve. Graduates to Meteora DAMM v2 / Jupiter when threshold is met.`;
+
+    return {
+      content: [{
+        type: "text" as const,
+        text,
+      }],
+    };
+  }
+);
+
+// =============================================================================
+// Tool: launch-token-launchlab
+// =============================================================================
+
+server.tool(
+  "launch-token-launchlab",
+  "Launch a new token on Raydium LaunchLab bonding curve. Graduates to Raydium CPMM or AMM pool at ~85 SOL, then tradeable on Jupiter.",
+  {
+    name: z.string().describe("Token name (e.g. 'Moon Dog')"),
+    symbol: z.string().describe("Token ticker symbol (e.g. 'MOON')"),
+    description: z.string().optional().describe("Token description (uploaded to IPFS if PINATA_JWT set)"),
+    imageUrl: z.string().optional().describe("Token image URL (included in metadata)"),
+    uri: z.string().optional().describe("Metadata JSON URL (auto-generated if description/imageUrl provided)"),
+    initialBuySol: z.number().optional().describe("SOL to spend on initial buy"),
+    slippageBps: z.number().optional().describe("Slippage tolerance in basis points (default: 500 = 5%)"),
+    migrateType: z.enum(["amm", "cpmm"]).optional().describe("Pool type after graduation: 'cpmm' (default) or 'amm'"),
+  },
+  async (params) => {
+    const result = await launchOnLaunchLab(params);
+
+    if (!result.success) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: `**Raydium LaunchLab Launch Failed**\n\nError: ${result.error}`,
+        }],
+      };
+    }
+
+    const data = result.data!;
+    let text = `**Token Launched on Raydium LaunchLab!**\n\n`;
+    text += `**Name:** ${params.name}\n`;
+    text += `**Symbol:** ${params.symbol.toUpperCase()}\n`;
+    text += `**Mint Address:** \`${data.mintAddress}\`\n`;
+    text += `**Pool ID:** \`${data.poolId}\`\n\n`;
+    text += `**Links:**\n`;
+    text += `- [View Transaction](${data.explorerUrl})\n`;
+    text += `\nToken trades on Raydium LaunchLab curve. Graduates to ${params.migrateType || "cpmm"} / Jupiter at ~85 SOL.`;
 
     return {
       content: [{
@@ -379,7 +532,11 @@ server.tool(
     }
 
     text += `\n**Available Tools:**\n`;
-    text += `- \`create-token\` - Launch new tokens on auto.fun\n`;
+    text += `- \`launch-token-raydium\` - Launch with Raydium CPMM pool (Jupiter)\n`;
+    text += `- \`launch-token-pumpfun\` - Launch on Pump.fun (#1 launchpad)\n`;
+    text += `- \`launch-token-meteora\` - Launch on Meteora DBC\n`;
+    text += `- \`launch-token-launchlab\` - Launch on Raydium LaunchLab\n`;
+    text += `- \`create-token\` - Launch on auto.fun\n`;
     text += `- \`buy-token\` - Buy tokens from bonding curve\n`;
     text += `- \`sell-token\` - Sell tokens back to bonding curve\n`;
     text += `- \`get-balance\` - Check wallet balances\n`;
@@ -407,7 +564,7 @@ async function main() {
   const transport = new StdioServerTransport();
 
   console.error("ClaudeCandle MCP Server starting...");
-  console.error(`   Platform: Raydium + auto.fun (on-chain)`);
+  console.error(`   Platforms: Raydium, Pump.fun, Meteora, LaunchLab, auto.fun`);
   console.error(`   Network: ${getNetwork()}`);
 
   try {
@@ -425,7 +582,7 @@ async function main() {
 
   await server.connect(transport);
   console.error("ClaudeCandle MCP Server running!");
-  console.error("   Tools: launch-token-raydium, create-token, buy-token, sell-token, get-balance, get-token-info, server-status");
+  console.error("   Tools: launch-token-raydium, launch-token-pumpfun, launch-token-meteora, launch-token-launchlab, create-token, buy-token, sell-token, get-balance, get-token-info, server-status");
 }
 
 main().catch((error) => {

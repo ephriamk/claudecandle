@@ -2,7 +2,7 @@
 
 MCP server and CLI tools for launching and trading Solana meme coins.
 
-Create tokens with Raydium CPMM pools (instantly tradeable on Jupiter) or auto.fun bonding curves — from Claude Desktop, Claude Code, or the command line.
+Launch tokens across 5 platforms — Raydium, Pump.fun, Meteora, LaunchLab, and auto.fun — from Claude Desktop, Claude Code, or the command line.
 
 ## Quick Start
 
@@ -79,8 +79,17 @@ Create tokens with Raydium CPMM pools (instantly tradeable on Jupiter) or auto.f
 3. **Run scripts**
 
    ```bash
-   # Launch on Raydium (immediately tradeable on Jupiter)
+   # Launch on Raydium CPMM (immediately tradeable on Jupiter)
    npx tsx scripts/raydium-launch.ts '{"name":"Moon Dog","symbol":"MOON","liquiditySol":5}'
+
+   # Launch on Pump.fun (biggest market, 73%)
+   npx tsx scripts/pumpfun-launch.ts '{"name":"Moon Dog","symbol":"MOON"}'
+
+   # Launch on Meteora DBC (powers Believe, Bags)
+   npx tsx scripts/meteora-launch.ts '{"name":"Moon Dog","symbol":"MOON"}'
+
+   # Launch on Raydium LaunchLab (bonding curve → CPMM)
+   npx tsx scripts/launchlab-launch.ts '{"name":"Moon Dog","symbol":"MOON"}'
 
    # Launch on auto.fun (bonding curve)
    npx tsx scripts/launch.ts '{"name":"Moon Dog","symbol":"MOON"}'
@@ -123,8 +132,11 @@ HELIUS_RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_KEY
 
 | Tool | Description |
 |------|-------------|
-| `launch-token-raydium` | Launch token with Raydium CPMM pool (tradeable on Jupiter immediately) |
-| `create-token` | Launch a new token with bonding curve on auto.fun |
+| `launch-token-raydium` | Launch with Raydium CPMM pool (tradeable on Jupiter immediately) |
+| `launch-token-pumpfun` | Launch on Pump.fun bonding curve (#1 launchpad, 73% market) |
+| `launch-token-meteora` | Launch on Meteora DBC (powers Believe, Bags, daos.fun) |
+| `launch-token-launchlab` | Launch on Raydium LaunchLab (bonding curve → Raydium CPMM) |
+| `create-token` | Launch on auto.fun bonding curve |
 | `buy-token` | Buy tokens from a bonding curve with SOL |
 | `sell-token` | Sell tokens back to a bonding curve for SOL |
 | `get-balance` | Check wallet SOL and SPL token balances |
