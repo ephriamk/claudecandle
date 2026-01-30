@@ -1,13 +1,23 @@
 {
-  "name": "promo",
+  "name": "claudecandle-promo",
   "version": "1.0.0",
-  "description": "",
+  "description": "ClaudeCandle marketing videos built with Remotion",
   "main": "index.js",
   "scripts": {
     "dev": "npx remotion studio src/index.ts",
-    "render": "npx remotion render src/index.ts ClaudeCandlePromo out/promo.mp4",
-    "render-gif": "npx remotion render src/index.ts ClaudeCandlePromo out/promo.gif --codec gif --every-nth-frame=2",
-    "render-vertical": "npx remotion render src/index.ts ClaudeCandlePromoVertical out/promo-vertical.mp4"
+    "render:hero": "npx remotion render src/index.ts HeroPromo out/hero-promo.mp4",
+    "render:launch60": "npx remotion render src/index.ts LaunchIn60 out/launch-in-60.mp4",
+    "render:pumpfun": "npx remotion render src/index.ts PumpfunDive out/pumpfun-dive.mp4",
+    "render:raydium": "npx remotion render src/index.ts RaydiumSpotlight out/raydium-spotlight.mp4",
+    "render:ai": "npx remotion render src/index.ts AIPowered out/ai-powered.mp4",
+    "render:5platforms": "npx remotion render src/index.ts FivePlatforms out/five-platforms.mp4",
+    "render:cli": "npx remotion render src/index.ts DevCLI out/dev-cli.mp4",
+    "render:security": "npx remotion render src/index.ts Security out/security.mp4",
+    "render:meteora": "npx remotion render src/index.ts MeteoraLaunchLab out/meteora-launchlab.mp4",
+    "render:sizzle": "npx remotion render src/index.ts SizzleReel out/sizzle-reel.mp4",
+    "render:sizzle-v": "npx remotion render src/index.ts SizzleReelVertical out/sizzle-reel-vertical.mp4",
+    "render:5platforms-v": "npx remotion render src/index.ts FivePlatformsVertical out/five-platforms-vertical.mp4",
+    "render:all": "npm run render:hero && npm run render:launch60 && npm run render:pumpfun && npm run render:raydium && npm run render:ai && npm run render:5platforms && npm run render:cli && npm run render:security && npm run render:meteora && npm run render:sizzle && npm run render:sizzle-v && npm run render:5platforms-v"
   },
   "keywords": [],
   "author": "",
