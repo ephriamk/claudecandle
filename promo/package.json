@@ -1,0 +1,30 @@
+{
+  "name": "promo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "npx remotion studio src/index.ts",
+    "render": "npx remotion render src/index.ts ClaudeCandlePromo out/promo.mp4",
+    "render-gif": "npx remotion render src/index.ts ClaudeCandlePromo out/promo.gif --codec gif --every-nth-frame=2",
+    "render-vertical": "npx remotion render src/index.ts ClaudeCandlePromoVertical out/promo-vertical.mp4"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@remotion/cli": "4.0.414",
+    "@remotion/google-fonts": "4.0.414",
+    "@remotion/layout-utils": "4.0.414",
+    "@remotion/transitions": "4.0.414",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "remotion": "4.0.414"
+  },
+  "devDependencies": {
+    "@remotion/bundler": "4.0.414",
+    "@types/react": "19.2.10",
+    "@types/react-dom": "19.2.3",
+    "typescript": "5.9.3"
+  }
+}
