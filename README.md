@@ -137,10 +137,10 @@ HELIUS_RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_KEY
 | `launch-token-meteora` | Launch on Meteora DBC (powers Believe, Bags, daos.fun) |
 | `launch-token-launchlab` | Launch on Raydium LaunchLab (bonding curve → Raydium CPMM) |
 | `create-token` | Launch on auto.fun bonding curve |
-| `buy-token` | Buy tokens from a bonding curve with SOL |
-| `sell-token` | Sell tokens back to a bonding curve for SOL |
+| `buy-token` | Buy auto.fun tokens from bonding curve with SOL |
+| `sell-token` | Sell auto.fun tokens back to bonding curve for SOL |
 | `get-balance` | Check wallet SOL and SPL token balances |
-| `get-token-info` | Get bonding curve price, reserves, and graduation progress |
+| `get-token-info` | Get auto.fun bonding curve price, reserves, and graduation progress |
 | `server-status` | Health check: RPC connection, wallet, and balance |
 
 ## Full Reference

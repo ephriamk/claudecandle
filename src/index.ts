@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 /**
- * ClaudeCandle - MCP Server for auto.fun
+ * ClaudeCandle - MCP Server for Solana Meme Coins
  *
- * An MCP server that enables Claude to create and trade tokens on auto.fun's
- * bonding curve contracts through natural language conversations.
+ * An MCP server that enables Claude to launch and trade Solana meme coins
+ * across multiple platforms through natural language conversations.
  *
  * Tools:
  * - launch-token-raydium: Launch with Raydium CPMM pool (Jupiter-tradeable)
@@ -310,7 +310,7 @@ server.tool(
 
 server.tool(
   "buy-token",
-  "Buy tokens from an auto.fun bonding curve using SOL. Fails if curve has graduated to Raydium.",
+  "Buy tokens from an auto.fun bonding curve using SOL. Only works with auto.fun tokens (not Pump.fun, Meteora, LaunchLab, or Raydium). Fails if curve has graduated.",
   {
     mintAddress: z.string().describe("Token mint address"),
     solAmount: z.number().positive().describe("Amount of SOL to spend"),
@@ -351,7 +351,7 @@ server.tool(
 
 server.tool(
   "sell-token",
-  "Sell tokens back to an auto.fun bonding curve for SOL. Use percentage (1-100) or exact tokenAmount.",
+  "Sell tokens back to an auto.fun bonding curve for SOL. Only works with auto.fun tokens (not Pump.fun, Meteora, LaunchLab, or Raydium). Use percentage (1-100) or exact tokenAmount.",
   {
     mintAddress: z.string().describe("Token mint address"),
     tokenAmount: z.number().optional().describe("Exact number of tokens to sell"),
@@ -436,7 +436,7 @@ server.tool(
 
 server.tool(
   "get-token-info",
-  "Get bonding curve status for an auto.fun token: price, reserves, progress to graduation, and more.",
+  "Get bonding curve status for an auto.fun token: price, reserves, progress to graduation. Only works with auto.fun tokens.",
   {
     mintAddress: z.string().describe("Token mint address"),
   },
@@ -521,7 +521,7 @@ server.tool(
 
     let text = `**ClaudeCandle Server Status**\n\n`;
     text += `**Version:** 2.0.0\n`;
-    text += `**Platform:** auto.fun (on-chain)\n`;
+    text += `**Platforms:** Raydium, Pump.fun, Meteora, LaunchLab, auto.fun\n`;
     text += `**Network:** ${network} ${isMain ? "(MAINNET)" : "(devnet)"}\n`;
     text += `**RPC:** ${rpcStatus}\n`;
     text += `**Wallet:** ${walletStatus}\n`;
@@ -537,10 +537,10 @@ server.tool(
     text += `- \`launch-token-meteora\` - Launch on Meteora DBC\n`;
     text += `- \`launch-token-launchlab\` - Launch on Raydium LaunchLab\n`;
     text += `- \`create-token\` - Launch on auto.fun\n`;
-    text += `- \`buy-token\` - Buy tokens from bonding curve\n`;
-    text += `- \`sell-token\` - Sell tokens back to bonding curve\n`;
+    text += `- \`buy-token\` - Buy tokens from auto.fun bonding curve\n`;
+    text += `- \`sell-token\` - Sell tokens back to auto.fun bonding curve\n`;
     text += `- \`get-balance\` - Check wallet balances\n`;
-    text += `- \`get-token-info\` - Get bonding curve status\n`;
+    text += `- \`get-token-info\` - Get auto.fun bonding curve status\n`;
     text += `- \`server-status\` - This status check\n`;
 
     if (isMain) {

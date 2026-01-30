@@ -130,7 +130,7 @@ Output: `{ success, mintAddress, signature, bondingCurve, explorerUrl, autofunUr
 If `initialBuySol > 0`, uses `launchAndSwap` for atomic creation + buy.
 If `description` or `imageUrl` is provided and `PINATA_JWT` is set, metadata is auto-uploaded to IPFS.
 
-### Buy Tokens
+### Buy Tokens (auto.fun only)
 
 ```bash
 npx tsx scripts/buy.ts '{"mintAddress":"...","solAmount":0.5}'
@@ -140,9 +140,11 @@ Required: `mintAddress`, `solAmount`
 Optional: `slippageBps` (default 500 = 5%)
 
 Output: `{ success, signature, estimatedTokens, minTokens, explorerUrl }`
+
+**Note:** Only works with auto.fun bonding curve tokens. For Pump.fun, Meteora, LaunchLab, or Raydium tokens, use the platform's native interface or Jupiter.
 Fails if bonding curve is completed (graduated to Raydium).
 
-### Sell Tokens
+### Sell Tokens (auto.fun only)
 
 ```bash
 npx tsx scripts/sell.ts '{"mintAddress":"...","percentage":100}'
@@ -154,6 +156,8 @@ Optional: `slippageBps`
 
 Output: `{ success, signature, estimatedSolReceived, explorerUrl }`
 
+**Note:** Only works with auto.fun bonding curve tokens. For other platforms, use their native interface or Jupiter.
+
 ### Check Balance
 
 ```bash
@@ -163,13 +167,15 @@ npx tsx scripts/balance.ts '{"address":"..."}'
 
 Output: `{ success, address, solBalance, tokens: [{ mint, balance, decimals }] }`
 
-### Token Info
+### Token Info (auto.fun only)
 
 ```bash
 npx tsx scripts/info.ts '{"mintAddress":"..."}'
 ```
 
 Output: `{ success, mintAddress, creator, bondingCurve, reserveSol, reserveTokens, priceInSol, curveLimitSol, progress, isCompleted, autofunUrl, explorerUrl }`
+
+**Note:** Only works with auto.fun bonding curve tokens.
 
 ## MCP Server
 

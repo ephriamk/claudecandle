@@ -18,7 +18,7 @@ async function main() {
   }
 
   const result = await getCurveInfo(args.mintAddress);
-  console.log(JSON.stringify(result.success ? { success: true, ...result.data } : result));
+  console.log(JSON.stringify(result, null, 2));
   process.exit(result.success ? 0 : 1);
 }
 

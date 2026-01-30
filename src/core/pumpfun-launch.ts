@@ -5,13 +5,13 @@
  *
  * Flow:
  * 1. Upload metadata to Pump.fun IPFS (or use Pinata/provided URI)
- * 2. Create token on Pump.fun bonding curve
- * 3. Optional: atomic initial buy
+ * 2. Build create instruction (+ optional buy) using lower-level SDK methods
+ * 3. Send transaction
  */
 
-import { Keypair, PublicKey } from "@solana/web3.js";
+import { Keypair, PublicKey, Transaction } from "@solana/web3.js";
 import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
-import { PumpFunSDK } from "pumpdotfun-sdk";
+import { PumpFunSDK, sendTx } from "pumpdotfun-sdk";
 
 import { getConnection, getSolBalance, getExplorerUrl } from "../services/solana.js";
 import { loadKeypair } from "../utils/keypair.js";
@@ -58,14 +58,15 @@ export async function launchOnPumpfun(
     const mint = Keypair.generate();
     console.error(`  Mint: ${mint.publicKey.toBase58()}`);
 
-    // Prepare metadata
+    // =========================================================================
+    // Step 1: Prepare metadata URI
+    // =========================================================================
     let metadataUri = params.uri || "";
 
-    // If no URI provided, try to build one
     if (!metadataUri) {
       if (params.imageUrl) {
-        // Fetch image and use Pump.fun IPFS via SDK
-        console.error("  Fetching image for metadata upload...");
+        // Fetch image and upload to Pump.fun's IPFS endpoint
+        console.error("  Uploading metadata to Pump.fun IPFS...");
         const imageResponse = await fetch(params.imageUrl);
         if (!imageResponse.ok) {
           return { success: false, error: `Failed to fetch image: ${imageResponse.status}` };
@@ -91,7 +92,10 @@ export async function launchOnPumpfun(
       }
     }
 
-    // Build and send create (+ optional buy) transaction
+    // =========================================================================
+    // Step 2: Build create + optional buy transaction using lower-level methods
+    // (Avoids createAndBuy which re-uploads metadata with an empty placeholder)
+    // =========================================================================
     const buyAmountSol = params.initialBuySol
       ? BigInt(Math.floor(params.initialBuySol * 1_000_000_000))
       : BigInt(0);
@@ -102,17 +106,35 @@ export async function launchOnPumpfun(
         : "  Creating token..."
     );
 
-    const result = await sdk.createAndBuy(
-      wallet,
-      mint,
-      {
-        name,
-        symbol,
-        description: params.description || "",
-        file: new Blob([""]), // Placeholder — SDK uses this only if no metadataUri from createTokenMetadata
-      },
-      buyAmountSol,
-      slippageBps,
+    // Build create instruction with the correct metadata URI
+    const createTx = await sdk.getCreateInstructions(
+      wallet.publicKey,
+      name,
+      symbol,
+      metadataUri,
+      mint
+    );
+
+    const fullTx = new Transaction().add(createTx);
+
+    // Add buy instructions if initial buy requested
+    if (buyAmountSol > 0) {
+      const buyTx = await sdk.getBuyInstructionsBySolAmount(
+        wallet.publicKey,
+        mint.publicKey,
+        buyAmountSol,
+        slippageBps,
+        "confirmed"
+      );
+      fullTx.add(buyTx);
+    }
+
+    // Send using SDK's sendTx for consistent transaction handling
+    const result = await sendTx(
+      conn,
+      fullTx,
+      wallet.publicKey,
+      [wallet, mint],
       { unitLimit: 250_000, unitPrice: 1_000 },
       "confirmed",
       "confirmed"

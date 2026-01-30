@@ -43,6 +43,7 @@
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@raydium-io/raydium-sdk-v2": "^0.2.32-alpha",
     "@solana/spl-token": "^0.4.14",
+    "bn.js": "^5.2.1",
     "@solana/web3.js": "^1.95.0",
     "bs58": "^6.0.0",
     "dotenv": "^16.4.0",
@@ -50,6 +51,7 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@types/bn.js": "^5.1.6",
     "@types/node": "^20.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.4.0"

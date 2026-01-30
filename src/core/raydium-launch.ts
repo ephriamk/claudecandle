@@ -19,6 +19,8 @@ import {
 import {
   createMint,
   mintTo,
+  setAuthority,
+  AuthorityType,
   getOrCreateAssociatedTokenAccount,
 } from "@solana/spl-token";
 import {
@@ -31,7 +33,6 @@ import {
   CREATE_CPMM_POOL_PROGRAM,
   CREATE_CPMM_POOL_FEE_ACC,
 } from "@raydium-io/raydium-sdk-v2";
-// @ts-ignore — bn.js has no bundled types, but works fine at runtime
 import BN from "bn.js";
 
 import { getConnection, getSolBalance, getExplorerUrl } from "../services/solana.js";
@@ -102,6 +103,10 @@ export async function launchOnRaydium(
     );
     await mintTo(conn, wallet, mint, ata.address, wallet.publicKey, totalSupplyRaw);
     console.error(`  Minted ${totalSupply.toLocaleString()} tokens`);
+
+    // Revoke mint authority so no more tokens can ever be minted
+    await setAuthority(conn, wallet, mint, wallet.publicKey, AuthorityType.MintTokens, null);
+    console.error("  Mint authority revoked (fixed supply)");
 
     // =========================================================================
     // Step 3: Create Metaplex metadata

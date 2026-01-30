@@ -198,20 +198,19 @@ export async function launchOnMeteora(
       signature = buySig;
     }
 
-    // Derive pool address
+    // Derive pool address from PDA seeds
     const { deriveDbcPoolAddress } = meteoraSdk as any;
-    let poolAddress = baseMintKeypair.publicKey.toBase58();
-    if (deriveDbcPoolAddress) {
-      try {
-        const poolPda = deriveDbcPoolAddress(
-          NATIVE_MINT,
-          baseMintKeypair.publicKey,
-          configKeypair.publicKey
-        );
-        poolAddress = poolPda.toBase58();
-      } catch {
-        // fallback to mint address as identifier
-      }
+    let poolAddress: string;
+    try {
+      const poolPda = deriveDbcPoolAddress(
+        NATIVE_MINT,
+        baseMintKeypair.publicKey,
+        configKeypair.publicKey
+      );
+      poolAddress = poolPda.toBase58();
+    } catch {
+      // PDA derivation not available — use config as identifier
+      poolAddress = configKeypair.publicKey.toBase58();
     }
 
     const mintAddress = baseMintKeypair.publicKey.toBase58();

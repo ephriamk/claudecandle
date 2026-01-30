@@ -17,7 +17,6 @@ import {
   TxVersion,
   LAUNCHPAD_PROGRAM,
 } from "@raydium-io/raydium-sdk-v2";
-// @ts-ignore — bn.js has no bundled types
 import BN from "bn.js";
 
 import { getConnection, getSolBalance, getExplorerUrl } from "../services/solana.js";

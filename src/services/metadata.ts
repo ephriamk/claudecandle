@@ -31,7 +31,7 @@ export function generateMetaplexJson(
     symbol,
     description: description || "",
     image: image || "",
-    external_url: "https://auto.fun",
+    external_url: "",
     properties: {
       category: "meme",
     },
